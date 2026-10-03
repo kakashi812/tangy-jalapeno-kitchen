@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+**/dist
+**/.next
+**/generated
+book
+CLAUDE.md

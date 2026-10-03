@@ -1,0 +1,24 @@
+# Local working notes (not part of the submission)
+book/
+CLAUDE.md
+
+# Dependencies
+node_modules/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.log
