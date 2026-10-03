@@ -1,0 +1,35 @@
+import { z } from 'zod';
+
+/**
+ * Every API error has this shape, so the frontend handles errors one way everywhere.
+ * - code: stable, machine-readable (the UI may branch on it)
+ * - message: human-readable, safe to show
+ * - fieldErrors: per-field messages keyed by field path ("lines.0.quantity"), for forms
+ */
+export const ApiErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
+});
+export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+/** Generic codes. Modules add their own domain codes (e.g. CUTOFF_PASSED) as they are built. */
+export const ErrorCode = {
+  ValidationFailed: 'VALIDATION_FAILED',
+  Unauthenticated: 'UNAUTHENTICATED',
+  Forbidden: 'FORBIDDEN',
+  NotFound: 'NOT_FOUND',
+  Conflict: 'CONFLICT',
+  Internal: 'INTERNAL',
+} as const;
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+/** Turns a Zod validation failure into the fieldErrors map. */
+export function toFieldErrors(error: z.ZodError): Record<string, string[]> {
+  const fieldErrors: Record<string, string[]> = {};
+  for (const issue of error.issues) {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '_root';
+    (fieldErrors[path] ??= []).push(issue.message);
+  }
+  return fieldErrors;
+}
