@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 // Locally the URLs come from apps/api/.env; on Vercel they are real environment variables.
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -9,5 +9,7 @@ export default defineConfig({
   migrations: { path: 'prisma/migrations' },
   // The CLI (migrations) uses the direct connection: Neon's pooler (PgBouncer) can't run migrations.
   // The running app uses the pooled DATABASE_URL through the Neon adapter (src/prisma/prisma.service.ts).
-  datasource: { url: env('DATABASE_URL_UNPOOLED') },
+  // Read without env() so `prisma generate` (run on every install) works without a database URL;
+  // migrate commands still fail with a clear error when it is missing.
+  datasource: { url: process.env.DATABASE_URL_UNPOOLED },
 });

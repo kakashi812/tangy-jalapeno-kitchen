@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepare": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "zod": "^4.6.5"
