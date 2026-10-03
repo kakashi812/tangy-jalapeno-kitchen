@@ -31,7 +31,7 @@ function toParams(query: DishListQuery): SearchParams {
   };
 }
 
-async function DishGrid({ query }: { query: DishListQuery }) {
+async function DishGrid({ query, showPrices }: { query: DishListQuery; showPrices: boolean }) {
   const params = new URLSearchParams(
     Object.entries({
       ...toParams(query),
@@ -51,7 +51,7 @@ async function DishGrid({ query }: { query: DishListQuery }) {
         <ul className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {result.items.map((dish) => (
             <li key={dish.id} className="flex">
-              <DishCard dish={dish} />
+              <DishCard dish={dish} showPrices={showPrices} />
             </li>
           ))}
         </ul>
@@ -137,7 +137,7 @@ export default async function DishesPage({
       </FilterBar>
 
       <Suspense key={JSON.stringify(query)} fallback={<DishGridSkeleton />}>
-        <DishGrid query={query} />
+        <DishGrid query={query} showPrices={can(user, 'pricing.read')} />
       </Suspense>
     </div>
   );

@@ -8,3 +8,4 @@ export * from './staff.js';
 export * from './calendar.js';
 export * from './settings.js';
 export * from './catalogue.js';
+export * from './pricing.js';

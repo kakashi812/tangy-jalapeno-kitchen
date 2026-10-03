@@ -3,18 +3,22 @@ import Link from 'next/link';
 import { Flame, Snowflake } from 'lucide-react';
 import { formatCents, type DishSummary } from '@fernleaf/shared';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const MAX_TAGS = 3;
 
-/** A dish as a card: large photo on top, the essentials underneath. The whole card opens the dish. */
-export function DishCard({ dish }: { dish: DishSummary }) {
+/**
+ * A dish as a card: large photo on top, the essentials underneath. The whole card opens the dish
+ * (the name's link is stretched over the card); the Prices button sits above it and opens the
+ * dish's prices on every tier.
+ */
+export function DishCard({ dish, showPrices }: { dish: DishSummary; showPrices: boolean }) {
   const extraTags = dish.dietaryTags.length - MAX_TAGS;
   return (
-    <Link
-      href={`/catalogue/dishes/${dish.id}`}
+    <div
       className={cn(
-        'group flex w-full flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+        'group relative flex w-full flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/50',
         !dish.isActive && 'opacity-70',
       )}
     >
@@ -51,7 +55,14 @@ export function DishCard({ dish }: { dish: DishSummary }) {
 
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div>
-          <h3 className="font-heading text-lg leading-tight font-bold">{dish.name}</h3>
+          <h3 className="font-heading text-lg leading-tight font-bold">
+            <Link
+              href={`/catalogue/dishes/${dish.id}`}
+              className="outline-none after:absolute after:inset-0"
+            >
+              {dish.name}
+            </Link>
+          </h3>
           <p className="text-xs text-muted-foreground">
             <span className="font-mono">{dish.sku}</span> ·{' '}
             {dish.station?.name ?? 'Unassigned station'}
@@ -79,14 +90,24 @@ export function DishCard({ dish }: { dish: DishSummary }) {
               ? `${dish.optionGroupCount} option group${dish.optionGroupCount === 1 ? '' : 's'}`
               : 'No options'}
           </span>
-          {dish.costCents !== undefined ? (
-            <span className="text-right">
-              <span className="block text-xs text-muted-foreground">Cost</span>
-              <span className="font-medium">{formatCents(dish.costCents)}</span>
-            </span>
-          ) : null}
+          <span className="flex items-end gap-3">
+            {dish.costCents !== undefined ? (
+              <span className="text-right">
+                <span className="block text-xs text-muted-foreground">Cost</span>
+                <span className="font-medium">{formatCents(dish.costCents)}</span>
+              </span>
+            ) : null}
+            {showPrices ? (
+              <Link
+                href={`/catalogue/dishes/${dish.id}#prices`}
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'relative z-10')}
+              >
+                Prices
+              </Link>
+            ) : null}
+          </span>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

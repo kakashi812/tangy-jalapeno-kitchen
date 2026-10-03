@@ -2,6 +2,7 @@ import {
   KeyRound,
   LayoutDashboard,
   ListChecks,
+  Tags,
   Settings,
   Users,
   UtensilsCrossed,
@@ -21,6 +22,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/catalogue', label: 'Catalogue', icon: UtensilsCrossed, permission: 'catalogue.read' },
+  { href: '/pricing', label: 'Pricing', icon: Tags, permission: 'pricing.read' },
   { href: '/staff', label: 'Staff', icon: Users, permission: 'staff.read' },
   { href: '/roles', label: 'Roles', icon: KeyRound, permission: 'roles.manage' },
   { href: '/reference', label: 'Reference lists', icon: ListChecks, permission: 'settings.manage' },

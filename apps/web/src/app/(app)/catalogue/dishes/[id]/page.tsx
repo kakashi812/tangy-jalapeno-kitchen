@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { DishDetail, OptionSummary, Paginated, ReferenceItem } from '@fernleaf/shared';
+import type {
+  DishDetail,
+  ItemTierPrice,
+  OptionSummary,
+  Paginated,
+  ReferenceItem,
+} from '@fernleaf/shared';
 import { NoAccess } from '@/components/no-access';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +16,7 @@ import { apiGet } from '@/lib/api/server';
 import { can, getSessionUser } from '@/lib/session';
 import { DishForm } from '../dish-form';
 import { DishImage } from './dish-image';
+import { DishPrices } from './dish-prices';
 import { OptionGroupsEditor } from './option-groups-editor';
 
 export const metadata: Metadata = { title: 'Dish' };
@@ -30,12 +37,14 @@ export default async function DishPage({ params }: { params: Promise<{ id: strin
 
   const { id } = await params;
   // All independent, so fetched in parallel.
-  const [dish, stations, allergens, dietaryTags, options] = await Promise.all([
+  const showPrices = can(user, 'pricing.read');
+  const [dish, stations, allergens, dietaryTags, options, prices] = await Promise.all([
     loadDish(id),
     apiGet<ReferenceItem[]>('/reference/stations?includeInactive=true'),
     apiGet<ReferenceItem[]>('/reference/allergens?includeInactive=true'),
     apiGet<ReferenceItem[]>('/reference/dietary-tags?includeInactive=true'),
     apiGet<Paginated<OptionSummary>>('/options?status=all&pageSize=100'),
+    showPrices ? apiGet<ItemTierPrice[]>(`/dishes/${id}/prices`) : Promise.resolve([]),
   ]);
 
   return (
@@ -61,6 +70,19 @@ export default async function DishPage({ params }: { params: Promise<{ id: strin
           <DishImage dish={dish} canEdit={canEdit} />
         </section>
       </div>
+
+      {showPrices ? (
+        <section id="prices" className="scroll-mt-6 space-y-3">
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-bold">Prices</h2>
+            <p className="text-sm text-muted-foreground">
+              The selling price of the dish itself on each tier (options are priced separately).
+              Edit prices in each tier.
+            </p>
+          </div>
+          <DishPrices prices={prices} sku={dish.sku} />
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div className="space-y-1">

@@ -174,6 +174,7 @@ model Dish {
   allergens    DishAllergen[]
   dietaryTags  DishDietaryTag[]
   optionGroups OptionGroup[]
+  prices       DishPrice[]
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
 
@@ -216,6 +217,7 @@ model Option {
   allergens   OptionAllergen[]
   dietaryTags OptionDietaryTag[]
   groupItems  OptionGroupItem[]
+  prices      OptionPrice[]
   createdAt   DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
 
@@ -277,4 +279,62 @@ model OptionGroupItem {
   @@unique([dishId, optionId])
   @@index([optionId])
   @@map("option_group_items")
+}
+
+// ─── Pricing (M4) ───────────────────────────────────────────────────────────────────────────
+
+enum PriceRule {
+  MANUAL
+  COST_MULTIPLIER
+  TIER_PERCENT
+}
+
+/// A named price list (Standard, Enterprise…). Exactly one is the default (partial unique index).
+/// Derived prices are computed when read (packages/shared/src/pricing.ts); only typed prices are stored.
+model PriceTier {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique
+  description  String        @default("")
+  isDefault    Boolean       @default(false)
+  rule         PriceRule
+  /// COST_MULTIPLIER: k in basis points (2.4 → 24000).
+  multiplierBp Int?
+  /// TIER_PERCENT: the base tier and the change in basis points (+15% → 1500).
+  baseTierId   String?       @db.Uuid
+  baseTier     PriceTier?    @relation("TierBase", fields: [baseTierId], references: [id], onDelete: Restrict)
+  derivedTiers PriceTier[]   @relation("TierBase")
+  percentBp    Int?
+  dishPrices   DishPrice[]
+  optionPrices OptionPrice[]
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  @@map("price_tiers")
+}
+
+/// A typed dish price: the price on a MANUAL tier, an override on a derived tier.
+model DishPrice {
+  tierId     String    @db.Uuid
+  dishId     String    @db.Uuid
+  priceCents Int
+  tier       PriceTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  dish       Dish      @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@id([tierId, dishId])
+  @@index([dishId])
+  @@map("dish_prices")
+}
+
+model OptionPrice {
+  tierId     String    @db.Uuid
+  optionId   String    @db.Uuid
+  priceCents Int
+  tier       PriceTier @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  option     Option    @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@id([tierId, optionId])
+  @@index([optionId])
+  @@map("option_prices")
 }

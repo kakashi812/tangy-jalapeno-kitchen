@@ -7,12 +7,13 @@ import { toDbDate } from '../common/db-dates.js';
 import { HOLIDAY_SEED, REFERENCE_SEED } from './reference-data.js';
 import { DEFAULT_ROLES } from './roles.js';
 import { seedMenu } from './seed-menu.js';
+import { seedPricing } from './seed-pricing.js';
 
 /**
  * Creates or restores the base data. Safe to run any number of times.
  * - Roles and staff accounts are upserted by name and email and **restored**: a run after someone
  *   edited the test accounts on the live app puts them back (password Test@1234, role, active).
- * - Settings, reference lists, kitchen holidays, options and dishes are only **created when
+ * - Settings, reference lists, kitchen holidays, options, dishes and price tiers are only **created when
  *   missing**, so an admin's edits in the panel survive.
  *
  *   pnpm --filter @fernleaf/api db:seed
@@ -110,9 +111,10 @@ async function main() {
     }
 
     const menu = await seedMenu(prisma);
+    const tiers = await seedPricing(prisma);
 
     console.log(
-      `Seeded ${menu.dishes} dishes, ${menu.options} options, ${DEFAULT_ROLES.length} roles, ${STAFF.length} staff accounts, settings, reference lists and ${HOLIDAY_SEED.length} kitchen holidays.`,
+      `Seeded ${tiers} price tiers, ${menu.dishes} dishes, ${menu.options} options, ${DEFAULT_ROLES.length} roles, ${STAFF.length} staff accounts, settings, reference lists and ${HOLIDAY_SEED.length} kitchen holidays.`,
     );
   } finally {
     await prisma.$disconnect();
