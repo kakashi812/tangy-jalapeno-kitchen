@@ -29,6 +29,8 @@ export const ErrorCode = {
   SelfLockout: 'SELF_LOCKOUT',
   SystemRoleLocked: 'SYSTEM_ROLE_LOCKED',
   RoleInUse: 'ROLE_IN_USE',
+  // Settings and reference data (M2)
+  ReferenceInUse: 'REFERENCE_IN_USE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

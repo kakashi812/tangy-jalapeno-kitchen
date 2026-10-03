@@ -1,13 +1,18 @@
 import { existsSync } from 'node:fs';
+import { DEFAULT_SETTINGS } from '@fernleaf/shared';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { hashPassword } from '../auth/password.js';
+import { toDbDate } from '../common/db-dates.js';
+import { HOLIDAY_SEED, REFERENCE_SEED } from './reference-data.js';
 import { DEFAULT_ROLES } from './roles.js';
 
 /**
- * Creates or restores the roles and staff accounts. Safe to run any number of times: it upserts by
- * name and email, so a second run changes nothing, and a run after someone edited the test accounts
- * on the live app puts them back (password Test@1234, original role, active).
+ * Creates or restores the base data. Safe to run any number of times.
+ * - Roles and staff accounts are upserted by name and email and **restored**: a run after someone
+ *   edited the test accounts on the live app puts them back (password Test@1234, role, active).
+ * - Settings, reference lists and kitchen holidays are only **created when missing**, so an
+ *   admin's edits in the panel survive.
  *
  *   pnpm --filter @fernleaf/api db:seed
  */
@@ -55,7 +60,57 @@ async function main() {
       });
     }
 
-    console.log(`Seeded ${DEFAULT_ROLES.length} roles and ${STAFF.length} staff accounts.`);
+    // Settings, reference lists and holidays are only created when missing: an admin's later
+    // edits in the panel survive a re-seed.
+    await prisma.platformSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, ...DEFAULT_SETTINGS },
+      update: {},
+    });
+
+    const tables = {
+      allergens: prisma.allergen,
+      'dietary-tags': prisma.dietaryTag,
+      stations: prisma.kitchenStation,
+      'portion-sizes': prisma.portionSize,
+      'packaging-types': prisma.packagingType,
+    };
+    for (const [kind, names] of Object.entries(REFERENCE_SEED) as [
+      keyof typeof tables,
+      string[],
+    ][]) {
+      const table = tables[kind] as unknown as {
+        upsert(args: {
+          where: { name: string };
+          create: { name: string; sortOrder: number };
+          update: Record<string, never>;
+        }): Promise<unknown>;
+      };
+      for (const [index, name] of names.entries()) {
+        await table.upsert({
+          where: { name },
+          create: { name, sortOrder: index * 10 },
+          update: {},
+        });
+      }
+    }
+
+    for (const holiday of HOLIDAY_SEED) {
+      const exists = await prisma.kitchenHoliday.findFirst({ where: { name: holiday.name } });
+      if (!exists) {
+        await prisma.kitchenHoliday.create({
+          data: {
+            name: holiday.name,
+            startDate: toDbDate(holiday.startDate),
+            endDate: toDbDate(holiday.endDate),
+          },
+        });
+      }
+    }
+
+    console.log(
+      `Seeded ${DEFAULT_ROLES.length} roles, ${STAFF.length} staff accounts, settings, reference lists and ${HOLIDAY_SEED.length} kitchen holidays.`,
+    );
   } finally {
     await prisma.$disconnect();
   }

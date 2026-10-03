@@ -129,7 +129,12 @@ export function EditStaffForm({
     <form onSubmit={handleSubmit(onSubmit)} className="max-w-md space-y-4" noValidate>
       <FormError message={errors.root?.server?.message} />
       <Field id="name" label="Name" error={errors.name?.message}>
-        <Input id="name" aria-invalid={!!errors.name} {...register('name')} />
+        <Input
+          id="name"
+          defaultValue={member.name}
+          aria-invalid={!!errors.name}
+          {...register('name')}
+        />
       </Field>
       <Field
         id="roleId"
@@ -142,6 +147,7 @@ export function EditStaffForm({
           roles={roles}
           invalid={!!errors.roleId}
           disabled={isSelf}
+          defaultValue={member.role.id}
           {...register('roleId')}
         />
       </Field>

@@ -49,3 +49,94 @@ model User {
   @@index([roleId])
   @@map("users")
 }
+
+// ─── Settings and reference data (M2) ───────────────────────────────────────────────────────
+
+/// Platform-wide settings: exactly one row (id = 1, enforced by a CHECK constraint).
+/// Typed columns rather than key/value pairs, so every value has a real type and constraint.
+model PlatformSettings {
+  id                        Int      @id @default(1)
+  /// Weekdays the kitchen works: 0 = Sunday … 6 = Saturday.
+  kitchenWorkingDays        Int[]
+  /// Orders lock this many kitchen working days before delivery…
+  cutoffDaysBefore          Int
+  /// …at this kitchen wall-clock time (minutes after midnight, Asia/Kolkata).
+  cutoffTimeMinutes         Int
+  /// Planned kitchen-ready = planned dispatch-ready − this.
+  kitchenReadyBufferMinutes Int
+  /// Work not started within this many minutes of planned kitchen-ready is "at risk".
+  atRiskMinutes             Int
+  updatedAt                 DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("platform_settings")
+}
+
+/// Days the kitchen is closed, as an inclusive date range. Skipped when counting back to a cut-off.
+model KitchenHoliday {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([startDate, endDate])
+  @@map("kitchen_holidays")
+}
+
+// Admin-managed lists. Same shape for each; items in use are deactivated rather than deleted
+// (later tables reference them with ON DELETE RESTRICT, so the database refuses the delete).
+
+model Allergen {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("allergens")
+}
+
+model DietaryTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("dietary_tags")
+}
+
+model KitchenStation {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("kitchen_stations")
+}
+
+model PortionSize {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("portion_sizes")
+}
+
+model PackagingType {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("packaging_types")
+}

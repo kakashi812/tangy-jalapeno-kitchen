@@ -92,12 +92,18 @@ export function RoleForm({ role }: { role?: RoleDetail }) {
       <FormError message={errors.root?.server?.message} />
       <div className="grid max-w-md gap-4">
         <Field id="name" label="Role name" error={errors.name?.message}>
-          <Input id="name" aria-invalid={!!errors.name} {...register('name')} />
+          <Input
+            id="name"
+            defaultValue={role?.name}
+            aria-invalid={!!errors.name}
+            {...register('name')}
+          />
         </Field>
         <Field id="description" label="Description" error={errors.description?.message}>
           <Input
             id="description"
             aria-invalid={!!errors.description}
+            defaultValue={role?.description}
             {...register('description')}
           />
         </Field>

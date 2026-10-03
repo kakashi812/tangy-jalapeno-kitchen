@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
    * NestJS API, so the auth cookie Nest sets is first-party (works in every browser) and no CORS
    * is needed. This is pure forwarding: no business logic runs in Next.js.
    */
+  /** /reference has no page of its own; it opens the first list. */
+  async redirects() {
+    return [{ source: '/reference', destination: '/reference/allergens', permanent: false }];
+  },
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${apiUrl}/:path*` }];
   },

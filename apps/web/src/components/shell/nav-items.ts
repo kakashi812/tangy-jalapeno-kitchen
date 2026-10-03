@@ -1,4 +1,11 @@
-import { KeyRound, LayoutDashboard, Users, type LucideIcon } from 'lucide-react';
+import {
+  KeyRound,
+  LayoutDashboard,
+  ListChecks,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import type { Permission } from '@fernleaf/shared';
 
 export type NavItem = {
@@ -14,4 +21,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/staff', label: 'Staff', icon: Users, permission: 'staff.read' },
   { href: '/roles', label: 'Roles', icon: KeyRound, permission: 'roles.manage' },
+  { href: '/reference', label: 'Reference lists', icon: ListChecks, permission: 'settings.manage' },
+  { href: '/settings', label: 'Settings', icon: Settings, permission: 'settings.manage' },
 ];
