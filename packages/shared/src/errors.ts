@@ -21,6 +21,14 @@ export const ErrorCode = {
   NotFound: 'NOT_FOUND',
   Conflict: 'CONFLICT',
   Internal: 'INTERNAL',
+  InvalidCredentials: 'INVALID_CREDENTIALS',
+  /** Another request changed the same data at the same moment; retrying is safe. */
+  ConcurrentUpdate: 'CONCURRENT_UPDATE',
+  // Staff and roles (M1)
+  LastAdmin: 'LAST_ADMIN',
+  SelfLockout: 'SELF_LOCKOUT',
+  SystemRoleLocked: 'SYSTEM_ROLE_LOCKED',
+  RoleInUse: 'ROLE_IN_USE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

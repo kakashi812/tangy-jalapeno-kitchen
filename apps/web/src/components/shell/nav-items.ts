@@ -1,9 +1,17 @@
-import { LayoutDashboard, type LucideIcon } from 'lucide-react';
+import { KeyRound, LayoutDashboard, Users, type LucideIcon } from 'lucide-react';
+import type { Permission } from '@fernleaf/shared';
 
-export type NavItem = { href: string; label: string; icon: LucideIcon };
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Shown only to staff with this permission. The API enforces the same rule on every request. */
+  permission?: Permission;
+};
 
-/**
- * Sidebar entries. Each module adds its own as it is built; from M1 the list is filtered by the
- * signed-in user's permissions (the server still enforces access on every request).
- */
-export const NAV_ITEMS: NavItem[] = [{ href: '/', label: 'Dashboard', icon: LayoutDashboard }];
+/** Sidebar entries. Each module adds its own as it is built. */
+export const NAV_ITEMS: NavItem[] = [
+  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/staff', label: 'Staff', icon: Users, permission: 'staff.read' },
+  { href: '/roles', label: 'Roles', icon: KeyRound, permission: 'roles.manage' },
+];

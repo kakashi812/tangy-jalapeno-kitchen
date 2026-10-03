@@ -6,6 +6,8 @@ import { z } from 'zod';
  */
 const EnvSchema = z.object({
   DATABASE_URL: z.url(),
+  JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
 });
 

@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { formatKitchenDateTime } from '@fernleaf/shared';
 import { apiGet } from '@/lib/api/server';
+import { getSessionUser } from '@/lib/session';
 
 type Health = { status: string; database: string; kitchenToday: string; serverTime: string };
 
@@ -29,11 +30,17 @@ function ApiStatusSkeleton() {
   );
 }
 
-/** Placeholder until the role dashboards (M12). Shows the streaming pattern every page will use. */
-export default function DashboardPage() {
+/** Placeholder until the role dashboards (M12). */
+export default async function DashboardPage() {
+  const user = await getSessionUser();
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
+      <div className="space-y-1">
+        <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Signed in as {user.name} ({user.role.name}). Role dashboards arrive in a later module.
+        </p>
+      </div>
       <section className="max-w-md space-y-3 rounded-lg border p-4">
         <h2 className="font-medium">System status</h2>
         <Suspense fallback={<ApiStatusSkeleton />}>

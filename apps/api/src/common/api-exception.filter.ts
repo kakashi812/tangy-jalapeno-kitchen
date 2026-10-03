@@ -27,6 +27,19 @@ function fromPrismaError(error: unknown): { status: number; body: ApiError } | u
         status: HttpStatus.CONFLICT,
         body: { code: ErrorCode.Conflict, message: 'A record with these details already exists' },
       };
+    case 'P2003': // foreign key: the record is still referenced elsewhere
+      return {
+        status: HttpStatus.CONFLICT,
+        body: { code: ErrorCode.Conflict, message: 'This record is still in use' },
+      };
+    case 'P2034': // serializable transaction conflict: another request changed the same rows
+      return {
+        status: HttpStatus.CONFLICT,
+        body: {
+          code: ErrorCode.ConcurrentUpdate,
+          message: 'Someone else changed this at the same moment. Please try again.',
+        },
+      };
     case 'P2025': // record required by the operation was not found
       return {
         status: HttpStatus.NOT_FOUND,

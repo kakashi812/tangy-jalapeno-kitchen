@@ -2,16 +2,30 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import type { Permission } from '@fernleaf/shared';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from './nav-items';
 
-/** Client component only because highlighting the current page needs the URL (usePathname). */
-export function NavLinks({ orientation }: { orientation: 'vertical' | 'horizontal' }) {
+/**
+ * Client component only because highlighting the current page needs the URL (usePathname).
+ * It receives the user's permissions (plain strings) rather than the items, because icon
+ * components can't be passed from the server to the browser.
+ */
+export function NavLinks({
+  orientation,
+  permissions,
+}: {
+  orientation: 'vertical' | 'horizontal';
+  permissions: Permission[];
+}) {
   const pathname = usePathname();
+  const items = NAV_ITEMS.filter(
+    (item) => !item.permission || permissions.includes(item.permission),
+  );
 
   return (
     <nav className={cn('flex gap-1', orientation === 'vertical' ? 'flex-col' : 'overflow-x-auto')}>
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
         return (
           <Link

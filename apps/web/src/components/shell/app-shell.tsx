@@ -1,4 +1,10 @@
-import { KITCHEN_TIME_ZONE, formatKitchenDate, kitchenToday } from '@fernleaf/shared';
+import {
+  KITCHEN_TIME_ZONE,
+  formatKitchenDate,
+  kitchenToday,
+  type SessionUser,
+} from '@fernleaf/shared';
+import { LogoutButton } from './logout-button';
 import { NavLinks } from './nav-links';
 
 function Brand() {
@@ -14,14 +20,14 @@ function Brand() {
  * navigation on phones (drivers use the panel on a phone). The date shown is the kitchen's today,
  * worked out on the server, so it is the same for every viewer wherever they are.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
   const today = formatKitchenDate(kitchenToday());
 
   return (
     <div className="flex min-h-dvh">
       <aside className="hidden w-60 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 md:flex">
         <Brand />
-        <NavLinks orientation="vertical" />
+        <NavLinks orientation="vertical" permissions={user.permissions} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -30,13 +36,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="md:hidden">
               <Brand />
             </div>
-            <p className="ml-auto text-sm text-muted-foreground">
+            <p className="hidden text-sm text-muted-foreground sm:block">
               Kitchen today: <span className="font-medium text-foreground">{today}</span>{' '}
               <span title={KITCHEN_TIME_ZONE}>(IST)</span>
             </p>
+            <div className="ml-auto flex items-center gap-3">
+              <div className="text-right text-sm leading-tight">
+                <div className="font-medium">{user.name}</div>
+                <div className="text-xs text-muted-foreground">{user.role.name}</div>
+              </div>
+              <LogoutButton />
+            </div>
           </div>
           <div className="md:hidden">
-            <NavLinks orientation="horizontal" />
+            <NavLinks orientation="horizontal" permissions={user.permissions} />
           </div>
         </header>
 

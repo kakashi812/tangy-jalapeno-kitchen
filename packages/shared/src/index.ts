@@ -3,3 +3,5 @@ export * from './kitchen-time.js';
 export * from './errors.js';
 export * from './pagination.js';
 export * from './permissions.js';
+export * from './auth.js';
+export * from './staff.js';
