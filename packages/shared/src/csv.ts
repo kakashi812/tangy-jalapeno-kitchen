@@ -1,0 +1,53 @@
+/**
+ * A small CSV reader (RFC 4180): comma-separated, fields may be "quoted", quotes inside quoted
+ * fields are doubled (""), quoted fields may contain commas and line breaks. Handles \n and \r\n
+ * line endings and a UTF-8 byte-order mark (Excel adds one). Written here rather than adding a
+ * dependency: employee import only needs this much.
+ */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+
+  const endField = () => {
+    row.push(field);
+    field = '';
+  };
+  const endRow = () => {
+    endField();
+    // Skip completely empty lines (e.g. a trailing newline).
+    if (!(row.length === 1 && row[0] === '')) rows.push(row);
+    row = [];
+  };
+
+  for (; i < text.length; i++) {
+    const char = text[i];
+    if (quoted) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += char;
+      }
+    } else if (char === '"' && field === '') {
+      quoted = true;
+    } else if (char === ',') {
+      endField();
+    } else if (char === '\n') {
+      endRow();
+    } else if (char === '\r') {
+      if (text[i + 1] === '\n') i++;
+      endRow();
+    } else {
+      field += char;
+    }
+  }
+  if (field !== '' || row.length > 0) endRow();
+  return rows;
+}

@@ -37,6 +37,8 @@ export const ErrorCode = {
   TierInUse: 'TIER_IN_USE',
   // Companies (M5)
   AddressInUse: 'ADDRESS_IN_USE',
+  // Employees (M6)
+  OwnerCannotMove: 'OWNER_CANNOT_MOVE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

@@ -112,7 +112,7 @@ export class CompaniesService {
       this.prisma.company.count({ where }),
       this.defaultTier(),
     ]);
-    const employeeCounts = await this.employeeCounts();
+    const employeeCounts = await this.employeeCounts(rows.map((r) => r.id));
     return {
       items: rows.map((row) => ({
         id: row.id,
@@ -135,7 +135,7 @@ export class CompaniesService {
       this.defaultTier(),
     ]);
     if (!row) throw ApiException.notFound('Company');
-    const employeeCounts = await this.employeeCounts();
+    const employeeCounts = await this.employeeCounts([id]);
     return {
       id: row.id,
       name: row.name,
@@ -154,7 +154,7 @@ export class CompaniesService {
       defaultPackagingType: row.defaultPackagingType,
       driverInstructions: row.driverInstructions,
       defaultDriver: row.defaultDriver,
-      owner: await this.owner(),
+      owner: await this.owner(id),
       addresses: row.addresses.map(toAddress),
       holidays: row.holidays.map(toHoliday),
     };
@@ -392,12 +392,20 @@ export class CompaniesService {
     }
   }
 
-  /** Employees and owners arrive in M6. */
-  protected async employeeCounts(): Promise<Map<string, number>> {
-    return new Map();
+  private async employeeCounts(companyIds: string[]): Promise<Map<string, number>> {
+    const groups = await this.prisma.employee.groupBy({
+      by: ['companyId'],
+      where: { companyId: { in: companyIds } },
+      _count: { _all: true },
+    });
+    return new Map(groups.map((g) => [g.companyId, g._count._all]));
   }
 
-  protected async owner(): Promise<CompanyDetail['owner']> {
-    return null;
+  private async owner(companyId: string): Promise<CompanyDetail['owner']> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { owner: { select: { id: true, name: true, email: true } } },
+    });
+    return company?.owner ?? null;
   }
 }

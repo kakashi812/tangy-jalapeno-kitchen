@@ -6,6 +6,8 @@ import {
   kitchenToday,
   type CompanyDetail,
   type DriverOption,
+  type EmployeeSummary,
+  type Paginated,
   type ReferenceItem,
   type TierSummary,
 } from '@fernleaf/shared';
@@ -18,6 +20,8 @@ import { can, getSessionUser } from '@/lib/session';
 import { CompanyForm } from '../company-form';
 import { Addresses } from './addresses';
 import { CompanyHolidays } from './company-holidays';
+import { AddEmployeeLink, EmployeeImport, OwnerPicker } from './company-employees';
+import { EmployeeTable } from '../../employees/employee-table';
 
 export const metadata: Metadata = { title: 'Company' };
 
@@ -73,6 +77,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       : Promise.resolve([]),
     canEdit ? apiGet<DriverOption[]>('/companies/drivers') : Promise.resolve([]),
   ]);
+  const canSeeEmployees = can(user, 'employees.read');
+  const employees = canSeeEmployees
+    ? await apiGet<Paginated<EmployeeSummary>>(`/employees?companyId=${id}&pageSize=100`)
+    : null;
 
   return (
     <div className="space-y-10">
@@ -97,6 +105,34 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       ) : (
         <CompanySummaryView company={company} />
       )}
+
+      {employees ? (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-1">
+              <h2 className="font-heading text-lg font-bold">Employees ({employees.total})</h2>
+              <p className="text-sm text-muted-foreground">
+                People meals are ordered for. The owner is one of them.
+              </p>
+            </div>
+            {can(user, 'employees.manage') ? <AddEmployeeLink companyId={company.id} /> : null}
+          </div>
+          {canEdit ? (
+            <OwnerPicker
+              companyId={company.id}
+              ownerId={company.owner?.id ?? null}
+              employees={employees.items}
+            />
+          ) : null}
+          <EmployeeTable employees={employees.items} showCompany={false} />
+          {employees.total > employees.items.length ? (
+            <Link href={`/employees?companyId=${company.id}`} className="text-sm hover:underline">
+              See all {employees.total} employees →
+            </Link>
+          ) : null}
+          {can(user, 'employees.manage') ? <EmployeeImport companyId={company.id} /> : null}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div className="space-y-1">

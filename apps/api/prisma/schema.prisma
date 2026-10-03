@@ -91,27 +91,29 @@ model KitchenHoliday {
 // (later tables reference them with ON DELETE RESTRICT, so the database refuses the delete).
 
 model Allergen {
-  id        String           @id @default(uuid()) @db.Uuid
-  name      String           @unique
-  isActive  Boolean          @default(true)
-  sortOrder Int              @default(0)
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String             @unique
+  isActive  Boolean            @default(true)
+  sortOrder Int                @default(0)
   dishes    DishAllergen[]
   options   OptionAllergen[]
-  createdAt DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
+  employees EmployeeAllergen[]
+  createdAt DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime           @updatedAt @db.Timestamptz(3)
 
   @@map("allergens")
 }
 
 model DietaryTag {
-  id        String             @id @default(uuid()) @db.Uuid
-  name      String             @unique
-  isActive  Boolean            @default(true)
-  sortOrder Int                @default(0)
+  id        String               @id @default(uuid()) @db.Uuid
+  name      String               @unique
+  isActive  Boolean              @default(true)
+  sortOrder Int                  @default(0)
   dishes    DishDietaryTag[]
   options   OptionDietaryTag[]
-  createdAt DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime           @updatedAt @db.Timestamptz(3)
+  employees EmployeeDietaryTag[]
+  createdAt DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime             @updatedAt @db.Timestamptz(3)
 
   @@map("dietary_tags")
 }
@@ -373,6 +375,10 @@ model Company {
   domains                    CompanyDomain[]
   addresses                  CompanyAddress[]
   holidays                   CompanyHoliday[]
+  employees                  Employee[]       @relation("CompanyEmployees")
+  /// The company owner: one of its own employees (composite FK on (ownerId, id) → employees(id, companyId)).
+  ownerId                    String?          @db.Uuid
+  owner                      Employee?        @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   createdAt                  DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt                  DateTime         @updatedAt @db.Timestamptz(3)
 
@@ -420,4 +426,53 @@ model CompanyHoliday {
 
   @@index([companyId, startDate])
   @@map("company_holidays")
+}
+
+// ─── Employees (M6) ─────────────────────────────────────────────────────────────────────────
+
+/// A person meals are ordered for. Never signs in. Belongs to exactly one company; their email must
+/// be on one of the company's domains (checked in the app). Not deleted (orders refer to them).
+model Employee {
+  id                    String               @id @default(uuid()) @db.Uuid
+  companyId             String               @db.Uuid
+  company               Company              @relation("CompanyEmployees", fields: [companyId], references: [id], onDelete: Restrict)
+  name                  String
+  /// Unique across all companies, lowercase (CHECK).
+  email                 String               @unique
+  phone                 String               @default("")
+  canChooseAddress      Boolean              @default(false)
+  canChangeDeliveryTime Boolean              @default(false)
+  canChangePackaging    Boolean              @default(false)
+  allergies             EmployeeAllergen[]
+  dietaryPreferences    EmployeeDietaryTag[]
+  ownerOf               Company[]            @relation("CompanyOwner")
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+
+  /// Target of the company-owner FK, so an owner always belongs to the company it owns.
+  @@unique([id, companyId])
+  @@index([companyId, name])
+  @@map("employees")
+}
+
+model EmployeeAllergen {
+  employeeId String   @db.Uuid
+  allergenId String   @db.Uuid
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+
+  @@id([employeeId, allergenId])
+  @@index([allergenId])
+  @@map("employee_allergens")
+}
+
+model EmployeeDietaryTag {
+  employeeId   String     @db.Uuid
+  dietaryTagId String     @db.Uuid
+  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  dietaryTag   DietaryTag @relation(fields: [dietaryTagId], references: [id], onDelete: Restrict)
+
+  @@id([employeeId, dietaryTagId])
+  @@index([dietaryTagId])
+  @@map("employee_dietary_tags")
 }
