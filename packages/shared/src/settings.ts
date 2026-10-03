@@ -5,19 +5,27 @@ import type { IsoDate } from './kitchen-time.js';
 // ─── Platform settings ──────────────────────────────────────────────────────────────────────
 
 /** Platform-wide values staff can change without touching code or the database (brief 4.10). */
-export const SettingsSchema = z.object({
-  kitchenWorkingDays: z
-    .array(z.number().int().min(0).max(6))
-    .min(1, 'Pick at least one working day')
-    .refine((days) => new Set(days).size === days.length, 'A day is listed twice'),
-  cutoffDaysBefore: z.number().int().min(0, 'Use 0 or more').max(14, 'At most 14 days'),
-  /** Minutes after midnight, kitchen time. */
-  cutoffTimeMinutes: z.number().int().min(0).max(1439),
-  /** Planned kitchen-ready = planned dispatch-ready − this (brief: 30). */
-  kitchenReadyBufferMinutes: z.number().int().min(0).max(240, 'At most 240 minutes'),
-  /** A unit not started within this many minutes of its planned kitchen-ready time is at risk. */
-  atRiskMinutes: z.number().int().min(0).max(240, 'At most 240 minutes'),
-});
+export const SettingsSchema = z
+  .object({
+    kitchenWorkingDays: z
+      .array(z.number().int().min(0).max(6))
+      .min(1, 'Pick at least one working day')
+      .refine((days) => new Set(days).size === days.length, 'A day is listed twice'),
+    cutoffDaysBefore: z.number().int().min(0, 'Use 0 or more').max(14, 'At most 14 days'),
+    /** Minutes after midnight, kitchen time. */
+    cutoffTimeMinutes: z.number().int().min(0).max(1439),
+    /** Planned kitchen-ready = planned dispatch-ready − this (brief: 30). */
+    kitchenReadyBufferMinutes: z.number().int().min(0).max(240, 'At most 240 minutes'),
+    /** A unit not started within this many minutes of its planned kitchen-ready time is at risk. */
+    atRiskMinutes: z.number().int().min(0).max(240, 'At most 240 minutes'),
+    /** Delivery times can be set between these kitchen times (decision 28). */
+    deliveryWindowStartMinutes: z.number().int().min(0).max(1439),
+    deliveryWindowEndMinutes: z.number().int().min(0).max(1439),
+  })
+  .refine((s) => s.deliveryWindowEndMinutes > s.deliveryWindowStartMinutes, {
+    path: ['deliveryWindowEndMinutes'],
+    message: 'The window must end after it starts',
+  });
 export type Settings = z.infer<typeof SettingsSchema>;
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +34,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cutoffTimeMinutes: 16 * 60,
   kitchenReadyBufferMinutes: 30,
   atRiskMinutes: 30,
+  deliveryWindowStartMinutes: 8 * 60,
+  deliveryWindowEndMinutes: 20 * 60,
 };
 
 // ─── Kitchen holidays ───────────────────────────────────────────────────────────────────────

@@ -37,6 +37,8 @@ export class SettingsService {
       cutoffTimeMinutes: row.cutoffTimeMinutes,
       kitchenReadyBufferMinutes: row.kitchenReadyBufferMinutes,
       atRiskMinutes: row.atRiskMinutes,
+      deliveryWindowStartMinutes: row.deliveryWindowStartMinutes,
+      deliveryWindowEndMinutes: row.deliveryWindowEndMinutes,
     };
   }
 

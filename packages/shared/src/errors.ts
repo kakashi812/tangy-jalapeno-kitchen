@@ -35,6 +35,8 @@ export const ErrorCode = {
   OptionInUse: 'OPTION_IN_USE',
   // Pricing (M4)
   TierInUse: 'TIER_IN_USE',
+  // Companies (M5)
+  AddressInUse: 'ADDRESS_IN_USE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

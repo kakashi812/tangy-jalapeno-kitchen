@@ -33,18 +33,19 @@ model Role {
 /// A staff member who signs in to the panel (admin, kitchen, dispatch, driver…). Not a customer:
 /// company employees are a separate model and never sign in.
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
+  id               String    @id @default(uuid()) @db.Uuid
   /// Always stored lowercase (enforced by a CHECK constraint in the migration).
-  email        String   @unique
-  name         String
-  passwordHash String
-  roleId       String   @db.Uuid
+  email            String    @unique
+  name             String
+  passwordHash     String
+  roleId           String    @db.Uuid
   /// Restrict: a role in use can't be deleted.
-  role         Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  role             Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
   /// Staff are deactivated, never deleted, because history (who cooked, who delivered) refers to them.
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  isActive         Boolean   @default(true)
+  defaultDriverFor Company[]
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
 
   @@index([roleId])
   @@map("users")
@@ -55,18 +56,21 @@ model User {
 /// Platform-wide settings: exactly one row (id = 1, enforced by a CHECK constraint).
 /// Typed columns rather than key/value pairs, so every value has a real type and constraint.
 model PlatformSettings {
-  id                        Int      @id @default(1)
+  id                         Int      @id @default(1)
   /// Weekdays the kitchen works: 0 = Sunday … 6 = Saturday.
-  kitchenWorkingDays        Int[]
+  kitchenWorkingDays         Int[]
   /// Orders lock this many kitchen working days before delivery…
-  cutoffDaysBefore          Int
+  cutoffDaysBefore           Int
   /// …at this kitchen wall-clock time (minutes after midnight, Asia/Kolkata).
-  cutoffTimeMinutes         Int
+  cutoffTimeMinutes          Int
   /// Planned kitchen-ready = planned dispatch-ready − this.
-  kitchenReadyBufferMinutes Int
+  kitchenReadyBufferMinutes  Int
   /// Work not started within this many minutes of planned kitchen-ready is "at risk".
-  atRiskMinutes             Int
-  updatedAt                 DateTime @updatedAt @db.Timestamptz(3)
+  atRiskMinutes              Int
+  /// Delivery times may be set between these kitchen times (decision 28).
+  deliveryWindowStartMinutes Int      @default(480)
+  deliveryWindowEndMinutes   Int      @default(1200)
+  updatedAt                  DateTime @updatedAt @db.Timestamptz(3)
 
   @@map("platform_settings")
 }
@@ -136,12 +140,13 @@ model PortionSize {
 }
 
 model PackagingType {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  companies Company[]
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 
   @@map("packaging_types")
 }
@@ -306,6 +311,7 @@ model PriceTier {
   percentBp    Int?
   dishPrices   DishPrice[]
   optionPrices OptionPrice[]
+  companies    Company[]
   createdAt    DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
 
@@ -337,4 +343,81 @@ model OptionPrice {
   @@id([tierId, optionId])
   @@index([optionId])
   @@map("option_prices")
+}
+
+// ─── Companies (M5) ─────────────────────────────────────────────────────────────────────────
+
+/// A client company. Its employees order meals; every order is billed to the company.
+model Company {
+  id                         String           @id @default(uuid()) @db.Uuid
+  name                       String           @unique
+  /// Deactivated companies take no new orders; existing orders carry on (decision 31).
+  isActive                   Boolean          @default(true)
+  /// Null = the default tier (brief 4.3.4).
+  priceTierId                String?          @db.Uuid
+  priceTier                  PriceTier?       @relation(fields: [priceTierId], references: [id], onDelete: Restrict)
+  billingContactName         String
+  billingEmail               String
+  billingPhone               String           @default("")
+  /// Days the company can receive deliveries: 0 = Sunday … 6 = Saturday. Never moves the cut-off.
+  workingDays                Int[]
+  /// Kitchen wall-clock minutes, quarter hours (e.g. 750 = 12:30).
+  defaultDeliveryTimeMinutes Int
+  /// Minutes before delivery the order must leave the kitchen (brief default 60).
+  dispatchLeadMinutes        Int              @default(60)
+  defaultPackagingTypeId     String           @db.Uuid
+  defaultPackagingType       PackagingType    @relation(fields: [defaultPackagingTypeId], references: [id], onDelete: Restrict)
+  driverInstructions         String           @default("")
+  defaultDriverId            String?          @db.Uuid
+  defaultDriver              User?            @relation(fields: [defaultDriverId], references: [id], onDelete: Restrict)
+  domains                    CompanyDomain[]
+  addresses                  CompanyAddress[]
+  holidays                   CompanyHoliday[]
+  createdAt                  DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@index([priceTierId])
+  @@map("companies")
+}
+
+/// An email domain a company owns. Unique across all companies (brief 4.4); stored lowercase.
+model CompanyDomain {
+  id        String  @id @default(uuid()) @db.Uuid
+  companyId String  @db.Uuid
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  domain    String  @unique
+
+  @@index([companyId])
+  @@map("company_domains")
+}
+
+/// A delivery address. One per company is the default (partial unique index).
+model CompanyAddress {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @db.Uuid
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  label         String
+  line1         String
+  line2         String   @default("")
+  city          String
+  postcode      String
+  deliveryNotes String   @default("")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([companyId])
+  @@map("company_addresses")
+}
+
+/// Days the company can't receive deliveries. Unlike kitchen closures, these never move the cut-off.
+model CompanyHoliday {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String   @db.Uuid
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  @@index([companyId, startDate])
+  @@map("company_holidays")
 }

@@ -236,9 +236,18 @@ export class PricingService {
     return options.map((option) => ({ ...option, sku: null }));
   }
 
-  /** Companies per tier. Companies arrive in M5; until then no tier is in use by a company. */
-  protected async companyCounts(): Promise<Map<string, number>> {
-    return new Map();
+  /** Companies per tier; companies without a tier of their own count towards the default tier. */
+  private async companyCounts(): Promise<Map<string, number>> {
+    const [groups, defaultTier] = await Promise.all([
+      this.prisma.company.groupBy({ by: ['priceTierId'], _count: { _all: true } }),
+      this.prisma.priceTier.findFirst({ where: { isDefault: true }, select: { id: true } }),
+    ]);
+    const counts = new Map<string, number>();
+    for (const group of groups) {
+      const tierId = group.priceTierId ?? defaultTier?.id;
+      if (tierId) counts.set(tierId, (counts.get(tierId) ?? 0) + group._count._all);
+    }
+    return counts;
   }
 
   private async assertNameFree(name: string, exceptId?: string): Promise<void> {

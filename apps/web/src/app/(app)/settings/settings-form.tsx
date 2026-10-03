@@ -21,21 +21,34 @@ const wholeNumber = (min: number, max: number) =>
     .max(max, `Use ${max} or less`);
 
 /** The form edits the cut-off time as "HH:mm"; the API stores minutes after midnight. */
-const FormSchema = z.object({
-  kitchenWorkingDays: z.array(z.number()).min(1, 'Pick at least one working day'),
-  cutoffDaysBefore: wholeNumber(0, 14),
-  cutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Enter a time'),
-  kitchenReadyBufferMinutes: wholeNumber(0, 240),
-  atRiskMinutes: wholeNumber(0, 240),
-});
+const FormSchema = z
+  .object({
+    kitchenWorkingDays: z.array(z.number()).min(1, 'Pick at least one working day'),
+    cutoffDaysBefore: wholeNumber(0, 14),
+    cutoffTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Enter a time'),
+    kitchenReadyBufferMinutes: wholeNumber(0, 240),
+    atRiskMinutes: wholeNumber(0, 240),
+    deliveryWindowStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Enter a time'),
+    deliveryWindowEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Enter a time'),
+  })
+  .refine((v) => v.deliveryWindowEnd > v.deliveryWindowStart, {
+    path: ['deliveryWindowEnd'],
+    message: 'Must be after the start',
+  });
 type FormValues = z.infer<typeof FormSchema>;
 
 /** Monday first, the way a kitchen reads its week. */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function toFormValues(settings: Settings): FormValues {
-  const { cutoffTimeMinutes, ...rest } = settings;
-  return { ...rest, cutoffTime: formatTimeOfDay(cutoffTimeMinutes) };
+  const { cutoffTimeMinutes, deliveryWindowStartMinutes, deliveryWindowEndMinutes, ...rest } =
+    settings;
+  return {
+    ...rest,
+    cutoffTime: formatTimeOfDay(cutoffTimeMinutes),
+    deliveryWindowStart: formatTimeOfDay(deliveryWindowStartMinutes),
+    deliveryWindowEnd: formatTimeOfDay(deliveryWindowEndMinutes),
+  };
 }
 
 export function SettingsForm({ settings }: { settings: Settings }) {
@@ -52,18 +65,28 @@ export function SettingsForm({ settings }: { settings: Settings }) {
     defaultValues: toFormValues(settings),
   });
 
-  async function onSubmit({ cutoffTime, ...rest }: FormValues) {
+  async function onSubmit({
+    cutoffTime,
+    deliveryWindowStart,
+    deliveryWindowEnd,
+    ...rest
+  }: FormValues) {
     try {
       const saved = await apiSend<Settings>('PUT', '/settings', {
         ...rest,
         cutoffTimeMinutes: parseTimeOfDay(cutoffTime),
+        deliveryWindowStartMinutes: parseTimeOfDay(deliveryWindowStart),
+        deliveryWindowEndMinutes: parseTimeOfDay(deliveryWindowEnd),
       });
       reset(toFormValues(saved));
       router.refresh(); // re-renders the cut-off preview with the new rules
     } catch (error) {
-      if (error instanceof ApiRequestError && error.fieldErrors.cutoffTimeMinutes) {
-        error.fieldErrors.cutoffTime = error.fieldErrors.cutoffTimeMinutes;
-        delete error.fieldErrors.cutoffTimeMinutes;
+      if (error instanceof ApiRequestError) {
+        const f = error.fieldErrors;
+        // The API reports times in minutes under their own names.
+        if (f.cutoffTimeMinutes) f.cutoffTime = f.cutoffTimeMinutes;
+        if (f.deliveryWindowStartMinutes) f.deliveryWindowStart = f.deliveryWindowStartMinutes;
+        if (f.deliveryWindowEndMinutes) f.deliveryWindowEnd = f.deliveryWindowEndMinutes;
       }
       showServerErrors(error, setError);
     }
@@ -163,6 +186,38 @@ export function SettingsForm({ settings }: { settings: Settings }) {
             aria-invalid={!!errors.atRiskMinutes}
             defaultValue={settings.atRiskMinutes}
             {...register('atRiskMinutes', { valueAsNumber: true })}
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          id="deliveryWindowStart"
+          label="Earliest delivery time"
+          hint="Delivery times can be set between these two times."
+          error={errors.deliveryWindowStart?.message}
+        >
+          <Input
+            id="deliveryWindowStart"
+            type="time"
+            step={900}
+            defaultValue={formatTimeOfDay(settings.deliveryWindowStartMinutes)}
+            aria-invalid={!!errors.deliveryWindowStart}
+            {...register('deliveryWindowStart')}
+          />
+        </Field>
+        <Field
+          id="deliveryWindowEnd"
+          label="Latest delivery time"
+          error={errors.deliveryWindowEnd?.message}
+        >
+          <Input
+            id="deliveryWindowEnd"
+            type="time"
+            step={900}
+            defaultValue={formatTimeOfDay(settings.deliveryWindowEndMinutes)}
+            aria-invalid={!!errors.deliveryWindowEnd}
+            {...register('deliveryWindowEnd')}
           />
         </Field>
       </div>
