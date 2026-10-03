@@ -39,6 +39,8 @@ export const ErrorCode = {
   AddressInUse: 'ADDRESS_IN_USE',
   // Employees (M6)
   OwnerCannotMove: 'OWNER_CANNOT_MOVE',
+  // Menu (M7)
+  SecretNotFound: 'SECRET_NOT_FOUND',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

@@ -8,6 +8,7 @@ import type { Permission, SessionUser } from '@fernleaf/shared';
 export const PUBLIC_KEY = 'access:public';
 export const SIGNED_IN_KEY = 'access:signedIn';
 export const PERMISSIONS_KEY = 'access:permissions';
+export const ANY_PERMISSION_KEY = 'access:anyPermission';
 
 /** Anyone, signed in or not (sign-in itself, health check). */
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
@@ -18,6 +19,10 @@ export const SignedIn = () => SetMetadata(SIGNED_IN_KEY, true);
 /** Signed in and holding every listed permission. */
 export const RequirePermission = (...permissions: [Permission, ...Permission[]]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+/** Signed in and holding at least one of the listed permissions. */
+export const RequireAnyPermission = (...permissions: [Permission, Permission, ...Permission[]]) =>
+  SetMetadata(ANY_PERMISSION_KEY, permissions);
 
 /** The signed-in staff member, attached to the request by the AccessGuard. */
 export const CurrentUser = createParamDecorator(

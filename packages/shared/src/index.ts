@@ -12,3 +12,4 @@ export * from './pricing.js';
 export * from './companies.js';
 export * from './csv.js';
 export * from './employees.js';
+export * from './menu.js';

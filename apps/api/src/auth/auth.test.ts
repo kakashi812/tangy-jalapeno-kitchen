@@ -9,7 +9,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthModule } from './auth.module.js';
 import { SESSION_COOKIE } from './auth.constants.js';
-import { Public, RequirePermission, SignedIn } from './decorators.js';
+import { Public, RequireAnyPermission, RequirePermission, SignedIn } from './decorators.js';
 import { hashPassword } from './password.js';
 
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
@@ -59,6 +59,12 @@ class ProbeController {
     return { ok: true };
   }
   @RequirePermission('orders.override') @Get('override') override() {
+    return { ok: true };
+  }
+  @RequireAnyPermission('orders.override', 'kitchen.view') @Get('any') any() {
+    return { ok: true };
+  }
+  @RequireAnyPermission('orders.override', 'billing.manage') @Get('any-missing') anyMissing() {
     return { ok: true };
   }
   @Get('forgotten') forgotten() {
@@ -240,6 +246,12 @@ describe('auth and access control', () => {
       expect((await get('/probe/override', await sessionCookie('admin@test.com'))).status).toBe(
         200,
       );
+    });
+
+    it('allows "any of" when one permission matches, refuses when none does', async () => {
+      const cookie = await sessionCookie('kitchen@test.com');
+      expect((await get('/probe/any', cookie)).status).toBe(200);
+      expect((await get('/probe/any-missing', cookie)).status).toBe(403);
     });
 
     it('refuses a route that declares no access rule, even for an admin', async () => {

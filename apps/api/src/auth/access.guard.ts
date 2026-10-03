@@ -5,7 +5,7 @@ import { ErrorCode, PERMISSIONS, type Permission, type SessionUser } from '@fern
 import { ApiException } from '../common/api-exception.js';
 import { SESSION_COOKIE } from './auth.constants.js';
 import { AuthService } from './auth.service.js';
-import { PERMISSIONS_KEY, PUBLIC_KEY, SIGNED_IN_KEY } from './decorators.js';
+import { ANY_PERMISSION_KEY, PERMISSIONS_KEY, PUBLIC_KEY, SIGNED_IN_KEY } from './decorators.js';
 
 /**
  * Runs before every route in the app (registered globally). It answers two questions:
@@ -54,10 +54,23 @@ export class AccessGuard implements CanActivate {
       return true;
     }
 
+    const anyOf = this.reflector.getAllAndOverride<Permission[] | undefined>(
+      ANY_PERMISSION_KEY,
+      targets,
+    );
+    if (anyOf) {
+      if (anyOf.some((permission) => user.permissions.includes(permission))) return true;
+      throw new ApiException(
+        HttpStatus.FORBIDDEN,
+        ErrorCode.Forbidden,
+        `You don't have permission to do this (needs one of: ${anyOf.map((p) => PERMISSIONS[p].label.toLowerCase()).join('; ')})`,
+      );
+    }
+
     if (this.reflector.getAllAndOverride<boolean>(SIGNED_IN_KEY, targets)) return true;
 
     this.logger.error(
-      `Route ${request.method} ${request.path} declares no access rule; refusing. Add @Public(), @SignedIn() or @RequirePermission().`,
+      `Route ${request.method} ${request.path} declares no access rule; refusing. Add @Public(), @SignedIn(), @RequirePermission() or @RequireAnyPermission().`,
     );
     throw new ApiException(HttpStatus.FORBIDDEN, ErrorCode.Forbidden, 'This action is not allowed');
   }

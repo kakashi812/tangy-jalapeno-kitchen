@@ -182,6 +182,7 @@ model Dish {
   dietaryTags  DishDietaryTag[]
   optionGroups OptionGroup[]
   prices       DishPrice[]
+  menuItems    MenuItem[]
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
 
@@ -351,36 +352,38 @@ model OptionPrice {
 
 /// A client company. Its employees order meals; every order is billed to the company.
 model Company {
-  id                         String           @id @default(uuid()) @db.Uuid
-  name                       String           @unique
+  id                         String                  @id @default(uuid()) @db.Uuid
+  name                       String                  @unique
   /// Deactivated companies take no new orders; existing orders carry on (decision 31).
-  isActive                   Boolean          @default(true)
+  isActive                   Boolean                 @default(true)
   /// Null = the default tier (brief 4.3.4).
-  priceTierId                String?          @db.Uuid
-  priceTier                  PriceTier?       @relation(fields: [priceTierId], references: [id], onDelete: Restrict)
+  priceTierId                String?                 @db.Uuid
+  priceTier                  PriceTier?              @relation(fields: [priceTierId], references: [id], onDelete: Restrict)
   billingContactName         String
   billingEmail               String
-  billingPhone               String           @default("")
+  billingPhone               String                  @default("")
   /// Days the company can receive deliveries: 0 = Sunday … 6 = Saturday. Never moves the cut-off.
   workingDays                Int[]
   /// Kitchen wall-clock minutes, quarter hours (e.g. 750 = 12:30).
   defaultDeliveryTimeMinutes Int
   /// Minutes before delivery the order must leave the kitchen (brief default 60).
-  dispatchLeadMinutes        Int              @default(60)
-  defaultPackagingTypeId     String           @db.Uuid
-  defaultPackagingType       PackagingType    @relation(fields: [defaultPackagingTypeId], references: [id], onDelete: Restrict)
-  driverInstructions         String           @default("")
-  defaultDriverId            String?          @db.Uuid
-  defaultDriver              User?            @relation(fields: [defaultDriverId], references: [id], onDelete: Restrict)
+  dispatchLeadMinutes        Int                     @default(60)
+  defaultPackagingTypeId     String                  @db.Uuid
+  defaultPackagingType       PackagingType           @relation(fields: [defaultPackagingTypeId], references: [id], onDelete: Restrict)
+  driverInstructions         String                  @default("")
+  defaultDriverId            String?                 @db.Uuid
+  defaultDriver              User?                   @relation(fields: [defaultDriverId], references: [id], onDelete: Restrict)
   domains                    CompanyDomain[]
   addresses                  CompanyAddress[]
   holidays                   CompanyHoliday[]
-  employees                  Employee[]       @relation("CompanyEmployees")
+  hiddenCategories           CompanyHiddenCategory[]
+  hiddenMenuItems            CompanyHiddenMenuItem[]
+  employees                  Employee[]              @relation("CompanyEmployees")
   /// The company owner: one of its own employees (composite FK on (ownerId, id) → employees(id, companyId)).
-  ownerId                    String?          @db.Uuid
-  owner                      Employee?        @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
-  createdAt                  DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt                  DateTime         @updatedAt @db.Timestamptz(3)
+  ownerId                    String?                 @db.Uuid
+  owner                      Employee?               @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  createdAt                  DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime                @updatedAt @db.Timestamptz(3)
 
   @@index([priceTierId])
   @@map("companies")
@@ -475,4 +478,65 @@ model EmployeeDietaryTag {
   @@id([employeeId, dietaryTagId])
   @@index([dietaryTagId])
   @@map("employee_dietary_tags")
+}
+
+// ─── Menu (M7) ──────────────────────────────────────────────────────────────────────────────
+
+/// A menu category ("Bowls", "Breakfast"). Secret categories aren't listed; staff open them with the
+/// access code (decision 21). Ordered by sortOrder.
+model MenuCategory {
+  id         String                  @id @default(uuid()) @db.Uuid
+  name       String                  @unique
+  sortOrder  Int
+  isActive   Boolean                 @default(true)
+  isSecret   Boolean                 @default(false)
+  /// Uppercase; set exactly when the category is secret (CHECK).
+  accessCode String?                 @unique
+  items      MenuItem[]
+  hiddenFor  CompanyHiddenCategory[]
+  createdAt  DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime                @updatedAt @db.Timestamptz(3)
+
+  @@map("menu_categories")
+}
+
+/// A dish shown in a category, in order. A dish can be in several categories (decision 20).
+model MenuItem {
+  id         String                  @id @default(uuid()) @db.Uuid
+  categoryId String                  @db.Uuid
+  category   MenuCategory            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  dishId     String                  @db.Uuid
+  /// Restrict: dishes are deactivated, never deleted.
+  dish       Dish                    @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  sortOrder  Int
+  isActive   Boolean                 @default(true)
+  hiddenFor  CompanyHiddenMenuItem[]
+
+  @@unique([categoryId, dishId])
+  @@index([dishId])
+  @@map("menu_items")
+}
+
+/// Categories a company doesn't see.
+model CompanyHiddenCategory {
+  companyId  String       @db.Uuid
+  categoryId String       @db.Uuid
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, categoryId])
+  @@index([categoryId])
+  @@map("company_hidden_categories")
+}
+
+/// Menu items a company doesn't see.
+model CompanyHiddenMenuItem {
+  companyId  String   @db.Uuid
+  menuItemId String   @db.Uuid
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, menuItemId])
+  @@index([menuItemId])
+  @@map("company_hidden_menu_items")
 }

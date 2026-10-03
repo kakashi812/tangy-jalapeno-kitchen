@@ -4,9 +4,11 @@ import { notFound } from 'next/navigation';
 import {
   formatTimeOfDay,
   kitchenToday,
+  type AdminMenuCategory,
   type CompanyDetail,
   type DriverOption,
   type EmployeeSummary,
+  type MenuHiding,
   type Paginated,
   type ReferenceItem,
   type TierSummary,
@@ -20,6 +22,7 @@ import { can, getSessionUser } from '@/lib/session';
 import { CompanyForm } from '../company-form';
 import { Addresses } from './addresses';
 import { CompanyHolidays } from './company-holidays';
+import { MenuVisibility } from './menu-visibility';
 import { AddEmployeeLink, EmployeeImport, OwnerPicker } from './company-employees';
 import { EmployeeTable } from '../../employees/employee-table';
 
@@ -77,6 +80,12 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       : Promise.resolve([]),
     canEdit ? apiGet<DriverOption[]>('/companies/drivers') : Promise.resolve([]),
   ]);
+  const [menuCategories, hiding] = can(user, 'menu.read')
+    ? await Promise.all([
+        apiGet<AdminMenuCategory[]>('/menu/categories'),
+        apiGet<MenuHiding>(`/companies/${id}/menu-hiding`),
+      ])
+    : [null, null];
   const canSeeEmployees = can(user, 'employees.read');
   const employees = canSeeEmployees
     ? await apiGet<Paginated<EmployeeSummary>>(`/employees?companyId=${id}&pageSize=100`)
@@ -131,6 +140,26 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
             </Link>
           ) : null}
           {can(user, 'employees.manage') ? <EmployeeImport companyId={company.id} /> : null}
+        </section>
+      ) : null}
+
+      {menuCategories && hiding ? (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-bold">Menu visibility</h2>
+            <p className="text-sm text-muted-foreground">
+              Tick a category or dish to hide it from this company&apos;s employees.{' '}
+              <Link href="/menu/preview" className="underline">
+                Preview an employee&apos;s menu
+              </Link>
+            </p>
+          </div>
+          <MenuVisibility
+            companyId={company.id}
+            categories={menuCategories}
+            hiding={hiding}
+            canEdit={canEdit}
+          />
         </section>
       ) : null}
 
