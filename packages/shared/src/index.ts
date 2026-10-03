@@ -7,3 +7,4 @@ export * from './auth.js';
 export * from './staff.js';
 export * from './calendar.js';
 export * from './settings.js';
+export * from './catalogue.js';

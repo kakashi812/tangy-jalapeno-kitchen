@@ -22,3 +22,12 @@ export async function apiSend<T = unknown>(
   if (!response.ok) throw await toApiRequestError(response);
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
+
+/** Uploads a file as multipart/form-data (e.g. a dish image) through the /api rewrite. */
+export async function apiUpload<T>(path: string, field: string, file: File): Promise<T> {
+  const body = new FormData();
+  body.append(field, file);
+  const response = await fetch(`/api${path}`, { method: 'POST', body });
+  if (!response.ok) throw await toApiRequestError(response);
+  return (await response.json()) as T;
+}

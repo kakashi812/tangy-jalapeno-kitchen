@@ -10,7 +10,7 @@
     "declaration": false,
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node", "multer"]
   },
   "include": ["src"]
 }

@@ -4,6 +4,7 @@ import {
   ListChecks,
   Settings,
   Users,
+  UtensilsCrossed,
   type LucideIcon,
 } from 'lucide-react';
 import type { Permission } from '@fernleaf/shared';
@@ -19,6 +20,7 @@ export type NavItem = {
 /** Sidebar entries. Each module adds its own as it is built. */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/catalogue', label: 'Catalogue', icon: UtensilsCrossed, permission: 'catalogue.read' },
   { href: '/staff', label: 'Staff', icon: Users, permission: 'staff.read' },
   { href: '/roles', label: 'Roles', icon: KeyRound, permission: 'roles.manage' },
   { href: '/reference', label: 'Reference lists', icon: ListChecks, permission: 'settings.manage' },

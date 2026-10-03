@@ -31,6 +31,8 @@ export const ErrorCode = {
   RoleInUse: 'ROLE_IN_USE',
   // Settings and reference data (M2)
   ReferenceInUse: 'REFERENCE_IN_USE',
+  // Catalogue (M3)
+  OptionInUse: 'OPTION_IN_USE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

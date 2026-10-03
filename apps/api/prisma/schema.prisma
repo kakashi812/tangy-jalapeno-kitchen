@@ -87,23 +87,27 @@ model KitchenHoliday {
 // (later tables reference them with ON DELETE RESTRICT, so the database refuses the delete).
 
 model Allergen {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id        String           @id @default(uuid()) @db.Uuid
+  name      String           @unique
+  isActive  Boolean          @default(true)
+  sortOrder Int              @default(0)
+  dishes    DishAllergen[]
+  options   OptionAllergen[]
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
 
   @@map("allergens")
 }
 
 model DietaryTag {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String             @unique
+  isActive  Boolean            @default(true)
+  sortOrder Int                @default(0)
+  dishes    DishDietaryTag[]
+  options   OptionDietaryTag[]
+  createdAt DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime           @updatedAt @db.Timestamptz(3)
 
   @@map("dietary_tags")
 }
@@ -113,6 +117,7 @@ model KitchenStation {
   name      String   @unique
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
+  dishes    Dish[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
@@ -139,4 +144,137 @@ model PackagingType {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@map("packaging_types")
+}
+
+// ─── Catalogue (M3) ─────────────────────────────────────────────────────────────────────────
+
+enum Temperature {
+  HOT
+  COLD
+}
+
+/// A dish on the catalogue. Deactivated, never deleted: past orders refer to it.
+/// Selling prices live in price tiers (M4); costCents is the kitchen's own cost.
+model Dish {
+  id           String           @id @default(uuid()) @db.Uuid
+  name         String
+  description  String           @default("")
+  /// Internal stock-keeping code, unique, uppercase (CHECK in the migration).
+  sku          String           @unique
+  temperature  Temperature
+  /// What the dish costs the kitchen to make, in cents. Internal only.
+  costCents    Int
+  imageUrl     String?
+  /// Null = "Unassigned" on the kitchen board.
+  stationId    String?          @db.Uuid
+  station      KitchenStation?  @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  /// Optional minimum quantity per order line (decision 10).
+  minOrderQty  Int?
+  isActive     Boolean          @default(true)
+  allergens    DishAllergen[]
+  dietaryTags  DishDietaryTag[]
+  optionGroups OptionGroup[]
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@index([stationId])
+  @@map("dishes")
+}
+
+// Join tables are explicit so deleting an allergen or tag that is in use is refused (RESTRICT),
+// while removing it from a dish or option is just deleting the link row.
+
+model DishAllergen {
+  dishId     String   @db.Uuid
+  allergenId String   @db.Uuid
+  dish       Dish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+
+  @@id([dishId, allergenId])
+  @@index([allergenId])
+  @@map("dish_allergens")
+}
+
+model DishDietaryTag {
+  dishId       String     @db.Uuid
+  dietaryTagId String     @db.Uuid
+  dish         Dish       @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  dietaryTag   DietaryTag @relation(fields: [dietaryTagId], references: [id], onDelete: Restrict)
+
+  @@id([dishId, dietaryTagId])
+  @@index([dietaryTagId])
+  @@map("dish_dietary_tags")
+}
+
+/// A reusable choice (paneer, jeera rice, raita…) offered by option groups on many dishes.
+model Option {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @unique
+  /// What the option costs the kitchen, in cents. Internal only.
+  costCents   Int
+  isActive    Boolean            @default(true)
+  allergens   OptionAllergen[]
+  dietaryTags OptionDietaryTag[]
+  groupItems  OptionGroupItem[]
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@map("options")
+}
+
+model OptionAllergen {
+  optionId   String   @db.Uuid
+  allergenId String   @db.Uuid
+  option     Option   @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+
+  @@id([optionId, allergenId])
+  @@index([allergenId])
+  @@map("option_allergens")
+}
+
+model OptionDietaryTag {
+  optionId     String     @db.Uuid
+  dietaryTagId String     @db.Uuid
+  option       Option     @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  dietaryTag   DietaryTag @relation(fields: [dietaryTagId], references: [id], onDelete: Restrict)
+
+  @@id([optionId, dietaryTagId])
+  @@index([dietaryTagId])
+  @@map("option_dietary_tags")
+}
+
+/// A group of choices on one dish, e.g. "Choose your protein". Required = minSelect >= 1.
+model OptionGroup {
+  id        String            @id @default(uuid()) @db.Uuid
+  dishId    String            @db.Uuid
+  dish      Dish              @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  name      String
+  minSelect Int
+  maxSelect Int
+  /// Display order on the dish.
+  sortOrder Int
+  items     OptionGroupItem[]
+
+  /// Lets OptionGroupItem reference (group, dish) together, so an item's dishId always matches its group.
+  @@unique([id, dishId])
+  @@index([dishId])
+  @@map("option_groups")
+}
+
+/// An option offered by a group, in display order. dishId is copied from the group so the
+/// database can enforce "an option appears in only one group of the same dish" (decision 62).
+model OptionGroupItem {
+  groupId   String      @db.Uuid
+  dishId    String      @db.Uuid
+  optionId  String      @db.Uuid
+  sortOrder Int
+  group     OptionGroup @relation(fields: [groupId, dishId], references: [id, dishId], onDelete: Cascade)
+  /// Restrict: an option offered by a dish can't be deleted (deactivate it instead).
+  option    Option      @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+  @@id([groupId, optionId])
+  @@unique([dishId, optionId])
+  @@index([optionId])
+  @@map("option_group_items")
 }

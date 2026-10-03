@@ -8,13 +8,12 @@ import {
   type StaffListQuery,
   type StaffMember,
 } from '@fernleaf/shared';
-import { selectClassName } from '@/components/form/field';
+import { FilterBar, FilterSearch, FilterSelect } from '@/components/filter-bar';
 import { NoAccess } from '@/components/no-access';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -129,41 +128,25 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       />
 
       {/* A plain GET form: filters go into the URL, so no JavaScript is needed to search. */}
-      <form className="flex flex-wrap items-end gap-3" action="/staff">
-        <Input
-          name="q"
-          defaultValue={query.q}
-          placeholder="Search name or email"
-          className="w-64"
-          aria-label="Search name or email"
-        />
-        <select
-          name="roleId"
-          defaultValue={query.roleId ?? ''}
-          className={`${selectClassName} w-40`}
-          aria-label="Role"
-        >
+      <FilterBar
+        action="/staff"
+        active={Boolean(query.q || query.roleId || query.status !== 'active')}
+      >
+        <FilterSearch name="q" defaultValue={query.q} placeholder="Search name or email" />
+        <FilterSelect name="roleId" defaultValue={query.roleId ?? ''} aria-label="Role">
           <option value="">All roles</option>
           {roles.map((role) => (
             <option key={role.id} value={role.id}>
               {role.name}
             </option>
           ))}
-        </select>
-        <select
-          name="status"
-          defaultValue={query.status}
-          className={`${selectClassName} w-40`}
-          aria-label="Status"
-        >
+        </FilterSelect>
+        <FilterSelect name="status" defaultValue={query.status} aria-label="Status">
           <option value="active">Active</option>
           <option value="inactive">Deactivated</option>
           <option value="all">All</option>
-        </select>
-        <Button type="submit" variant="outline">
-          Filter
-        </Button>
-      </form>
+        </FilterSelect>
+      </FilterBar>
 
       <Suspense key={JSON.stringify(query)} fallback={<TableSkeleton />}>
         <StaffTable query={query} />

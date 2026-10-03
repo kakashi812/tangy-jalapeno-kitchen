@@ -16,6 +16,8 @@ const CODE_BY_STATUS: Partial<Record<number, string>> = {
   [HttpStatus.FORBIDDEN]: ErrorCode.Forbidden,
   [HttpStatus.NOT_FOUND]: ErrorCode.NotFound,
   [HttpStatus.CONFLICT]: ErrorCode.Conflict,
+  // Upload over the size limit (raised by the upload middleware before our code runs).
+  [HttpStatus.PAYLOAD_TOO_LARGE]: ErrorCode.ValidationFailed,
 };
 
 /** Prisma's known request errors we can explain to the user. Checked by shape, not class. */

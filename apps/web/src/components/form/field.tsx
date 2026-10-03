@@ -44,3 +44,7 @@ export function FormError({ message }: { message?: string }) {
 /** Styles a native <select> like the shadcn Input (native selects work everywhere, incl. phones). */
 export const selectClassName =
   'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive disabled:opacity-50';
+
+/** Styles a native <textarea> like the shadcn Input. */
+export const textareaClassName =
+  'min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive disabled:opacity-50';
