@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatCents, multiplyCents, parseDollars, roundUpToNext5Cents, sumCents } from './money';
+import {
+  formatCents,
+  multiplyCents,
+  parseDollars,
+  roundUpToNext5Cents,
+  sumCents,
+} from './money.js';
 
 describe('roundUpToNext5Cents', () => {
   it('rounds up to the next multiple of 5 (brief example $2.11 → $2.15)', () => {

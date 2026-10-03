@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { toFieldErrors } from './errors';
-import { PageQuerySchema, pageCount, pageOffset } from './pagination';
+import { toFieldErrors } from './errors.js';
+import { PageQuerySchema, pageCount, pageOffset } from './pagination.js';
 
 describe('toFieldErrors', () => {
   it('keys messages by dotted field path', () => {

@@ -7,7 +7,7 @@ import {
   kitchenDateTimeToUtc,
   kitchenToday,
   parseTimeOfDay,
-} from './kitchen-time';
+} from './kitchen-time.js';
 
 describe('kitchenToday (Asia/Kolkata, UTC+05:30)', () => {
   it('is already the next day in the kitchen late in the UTC evening', () => {
