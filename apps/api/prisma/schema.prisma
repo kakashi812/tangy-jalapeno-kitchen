@@ -1,4 +1,4 @@
-// Domain models are added module by module (M1 onwards).
+// Domain models are added module by module. Tables are snake_case plurals; columns stay camelCase.
 
 generator client {
   provider            = "prisma-client"
@@ -9,4 +9,43 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Staff and access (M1) ──────────────────────────────────────────────────────────────────
+
+/// A named set of permissions. Roles are data: adding one needs no code change.
+/// Permission names are validated against the list in @fernleaf/shared before they are saved.
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String   @default("")
+  /// System roles (Admin) are locked: they can't be edited or deleted, and always have every
+  /// permission, including ones added in later releases.
+  isSystem    Boolean  @default(false)
+  permissions String[]
+  users       User[]
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("roles")
+}
+
+/// A staff member who signs in to the panel (admin, kitchen, dispatch, driver…). Not a customer:
+/// company employees are a separate model and never sign in.
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// Always stored lowercase (enforced by a CHECK constraint in the migration).
+  email        String   @unique
+  name         String
+  passwordHash String
+  roleId       String   @db.Uuid
+  /// Restrict: a role in use can't be deleted.
+  role         Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  /// Staff are deactivated, never deleted, because history (who cooked, who delivered) refers to them.
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([roleId])
+  @@map("users")
 }
