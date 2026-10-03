@@ -4,3 +4,4 @@ pnpm-lock.yaml
 **/generated
 book
 CLAUDE.md
+**/next-env.d.ts

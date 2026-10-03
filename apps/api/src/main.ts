@@ -5,7 +5,7 @@ import { AppModule } from './app.module.js';
 import { configureApp } from './app.setup.js';
 import { loadEnv } from './config/env.js';
 
-// Locally, variables come from apps/api/.env. 
+// Locally, variables come from apps/api/.env.
 if (existsSync('.env')) process.loadEnvFile('.env');
 
 async function bootstrap() {

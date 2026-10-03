@@ -119,3 +119,35 @@ export function formatTimeOfDay(minutes: MinutesOfDay): string {
   assertMinutesOfDay(minutes);
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
+
+/*
+ * Display helpers. The UI must format dates and times through these, never with toLocaleString()
+ * or getHours() on their own, which use the viewer's zone. The locale and zone are fixed, so the
+ * server and the browser render the same text (no hydration mismatch).
+ */
+const DISPLAY_LOCALE = 'en-GB';
+
+/** "2026-10-07" → "Wed 7 Oct 2026" */
+export function formatKitchenDate(date: IsoDate): string {
+  const [y, m, d] = parseIsoDate(date);
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    timeZone: 'UTC', // a calendar date has no zone; read its parts as-is
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+    .format(new Date(Date.UTC(y, m - 1, d)))
+    .replace(',', '');
+}
+
+/** An instant as kitchen wall-clock time: "16:00" */
+export function formatKitchenTime(instant: Date, timeZone: string = KITCHEN_TIME_ZONE): string {
+  const p = zonedParts(instant, timeZone);
+  return formatTimeOfDay(p.hour * 60 + p.minute);
+}
+
+/** An instant as kitchen date and time: "Wed 7 Oct 2026, 16:00" */
+export function formatKitchenDateTime(instant: Date, timeZone: string = KITCHEN_TIME_ZONE): string {
+  return `${formatKitchenDate(kitchenToday(instant, timeZone))}, ${formatKitchenTime(instant, timeZone)}`;
+}

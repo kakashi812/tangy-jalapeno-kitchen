@@ -6,7 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -15,8 +15,9 @@
     "test": "pnpm -r test"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "eslint": "^10.11.0",
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.3.8",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.9",
     "typescript": "~6.0.3",

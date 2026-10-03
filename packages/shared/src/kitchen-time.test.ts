@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   dayOfWeek,
+  formatKitchenDate,
+  formatKitchenDateTime,
+  formatKitchenTime,
   formatTimeOfDay,
   isIsoDate,
   kitchenDateTimeToUtc,
@@ -77,5 +80,19 @@ describe('time of day', () => {
   it('rejects malformed times', () => {
     expect(() => parseTimeOfDay('24:00')).toThrow(RangeError);
     expect(() => parseTimeOfDay('9:00')).toThrow(RangeError);
+  });
+});
+
+describe('display helpers', () => {
+  it('formats calendar dates without shifting the day', () => {
+    expect(formatKitchenDate('2026-10-07')).toBe('Wed 7 Oct 2026');
+  });
+
+  it('shows instants in kitchen time, whatever the machine zone', () => {
+    const instant = new Date('2026-10-07T10:30:00Z');
+    expect(formatKitchenTime(instant)).toBe('16:00');
+    expect(formatKitchenDateTime(instant)).toBe('Wed 7 Oct 2026, 16:00');
+    // 20:00 UTC is already the next morning in the kitchen.
+    expect(formatKitchenDateTime(new Date('2026-10-06T20:00:00Z'))).toBe('Wed 7 Oct 2026, 01:30');
   });
 });
