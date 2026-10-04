@@ -23,9 +23,10 @@ import {
   type OrderLine,
 } from '@fernleaf/shared';
 import { Field, FormError, selectClassName, textareaClassName } from '@/components/form/field';
-import { MenuDishCard, groupRule } from '@/components/menu/menu-dish-card';
+import { MenuDishCard } from '@/components/menu/menu-dish-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LineDialog, blankLine, type LineDraft } from './line-dialog';
 import { ApiRequestError, toApiRequestError } from '@/lib/api/api-error';
 import { apiSend } from '@/lib/api/client';
 import { showServerErrors } from '@/lib/forms';
@@ -33,11 +34,8 @@ import { showServerErrors } from '@/lib/forms';
 type Values = z.input<typeof OrderInputSchema>;
 /** Only the money-authorized edit page passes saved lines to this form. */
 export type EditableOrder = Omit<OrderDetail, 'lines'> & { lines: OrderLine[] };
-const newLine = (dish: MenuDish, quantity = 1) => ({
-  menuItemId: dish.menuItemId,
-  quantity,
-  combinations: [{ quantity, optionIds: [] as string[] }],
-});
+/** Which line the dialog is setting up: a new one (index null) or an existing one. */
+type Editing = { index: number | null; dish: MenuDish; initial: LineDraft };
 
 export function OrderForm({
   context: initialContext,
@@ -54,6 +52,8 @@ export function OrderForm({
   const [codeError, setCodeError] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [existingId, setExistingId] = useState<string>();
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [notice, setNotice] = useState('');
   const defaults: OrderInput = {
     employeeId: order?.employee.id ?? context.menu.employee.id,
     deliveryDate: order?.deliveryDate ?? context.deliveryDate,
@@ -124,6 +124,41 @@ export function OrderForm({
   const total = previews.every((p) => p.cents !== undefined)
     ? previews.reduce((sum, p) => sum + (p.cents ?? 0), 0)
     : undefined;
+
+  function openLine(dish: MenuDish, index: number | null) {
+    const current = index === null ? undefined : lines[index];
+    const offered = new Set(dish.groups.flatMap((g) => g.options.map((o) => o.id)));
+    const initial: LineDraft = current
+      ? {
+          menuItemId: dish.menuItemId,
+          quantity: current.quantity,
+          // Choices no longer on the menu can't be kept; the dialog asks for new ones.
+          combinations: current.combinations.map((c) => ({
+            quantity: c.quantity,
+            optionIds: c.optionIds.filter((id) => offered.has(id)),
+          })),
+        }
+      : blankLine(dish, dish.minOrderQty ?? 1);
+    setEditing({ index, dish, initial });
+  }
+  function saveLine(line: LineDraft) {
+    if (!editing) return;
+    if (editing.index === null) {
+      append(line);
+      setNotice(`Added ${line.quantity} × ${editing.dish.name}`);
+    } else {
+      const saved = order?.lines.find((l) => l.id === lines[editing.index!]?.id);
+      // Unchanged saved lines keep their id, and with it their original snapshot and prices.
+      const keep = saved && sameLine({ ...line, id: saved.id }, saved);
+      update(editing.index, keep ? { ...line, id: saved.id } : line);
+      setNotice(`Updated ${editing.dish.name}`);
+    }
+    setEditing(null);
+  }
+  function optionSummary(dish: MenuDish | undefined, optionIds: string[]) {
+    const names = new Map(dish?.groups.flatMap((g) => g.options.map((o) => [o.id, o.name])) ?? []);
+    return optionIds.map((id) => names.get(id) ?? 'unavailable option').join(' + ') || 'No options';
+  }
 
   async function unlock() {
     setCodeError('');
@@ -348,177 +383,80 @@ export function OrderForm({
           </Field>
         </div>
       </section>
-      <section className="space-y-4">
+      <section id="order-lines" className="scroll-mt-4 space-y-3">
         <h2 className="font-heading text-xl font-bold">Order lines</h2>
         {!fields.length && (
           <p className="text-sm text-muted-foreground">
-            Add dishes from the menu below. Empty drafts are allowed.
+            Choose dishes from the menu below. Empty drafts are allowed.
           </p>
         )}
         {fields.map((field, index) => {
           const line = lines[index];
           if (!line) return null;
           const saved = order?.lines.find((l) => l.id === line.id);
+          const unchanged = saved && sameLine(line, saved);
           const dish = dishes.find((d) => d.menuItemId === line.menuItemId);
           return (
-            <article key={field.formKey} className="space-y-4 rounded-lg border p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-medium">{saved?.name ?? dish?.name ?? 'Unavailable dish'}</h3>
-                <div className="flex items-center gap-3">
-                  <span className="tabular-nums">
-                    {previews[index]?.cents === undefined
-                      ? 'Incomplete'
-                      : formatCents(previews[index]!.cents!)}
-                  </span>
+            <article
+              key={field.formKey}
+              className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4"
+            >
+              <div className="min-w-0 space-y-1">
+                <h3 className="font-medium">
+                  {line.quantity} × {saved?.name ?? dish?.name ?? 'Unavailable dish'}
+                </h3>
+                <ul className="space-y-0.5 text-sm text-muted-foreground">
+                  {unchanged
+                    ? saved.combinations.map((c, i) => (
+                        <li key={i}>
+                          {c.quantity} × {c.options.map((o) => o.name).join(' + ') || 'No options'}{' '}
+                          · {formatCents(c.unitPriceCents)} each
+                        </li>
+                      ))
+                    : line.combinations.map((c, i) => (
+                        <li key={i}>
+                          {c.quantity} × {optionSummary(dish, c.optionIds)}
+                        </li>
+                      ))}
+                </ul>
+                {unchanged && (
+                  <p className="text-xs text-muted-foreground">
+                    Saved line at its original prices. Leaving it unchanged keeps that snapshot.
+                  </p>
+                )}
+                {!dish && (
+                  <p className="text-sm text-amber-700">
+                    No longer on this employee&apos;s menu. Keep the saved line unchanged or remove
+                    it.
+                  </p>
+                )}
+                <FormError message={previews[index]?.error} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium tabular-nums">
+                  {previews[index]?.cents === undefined
+                    ? 'Incomplete'
+                    : formatCents(previews[index]!.cents!)}
+                </span>
+                {dish && (
                   <Button
                     type="button"
-                    variant="ghost"
-                    onClick={() => remove(index)}
+                    variant="outline"
+                    onClick={() => openLine(dish, index)}
                     disabled={isSubmitting}
                   >
-                    Remove line
+                    {unchanged ? 'Change' : 'Edit'}
                   </Button>
-                </div>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => remove(index)}
+                  disabled={isSubmitting}
+                >
+                  Remove
+                </Button>
               </div>
-              {saved ? (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    Saved line: {saved.quantity} meals at original prices. Keeping it unchanged
-                    preserves its snapshot.
-                  </p>
-                  <ul className="space-y-1 text-sm">
-                    {saved.combinations.map((c, i) => (
-                      <li key={i}>
-                        {c.quantity} × {c.options.map((o) => o.name).join(' + ') || 'No options'} ·{' '}
-                        {formatCents(c.unitPriceCents)} each
-                      </li>
-                    ))}
-                  </ul>
-                  {dish ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => update(index, newLine(dish, saved.quantity))}
-                    >
-                      Change line using current menu and prices
-                    </Button>
-                  ) : (
-                    <p className="text-sm text-amber-700">
-                      No longer available on the current menu. This saved line can stay unchanged or
-                      be removed.
-                    </p>
-                  )}
-                </>
-              ) : dish ? (
-                <>
-                  <Field id={`line-${index}-quantity`} label="Line quantity">
-                    <Input
-                      id={`line-${index}-quantity`}
-                      type="number"
-                      min={1}
-                      max={500}
-                      className="max-w-32"
-                      {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
-                      defaultValue={line.quantity}
-                    />
-                  </Field>
-                  {line.combinations.map((combination, ci) => (
-                    <fieldset key={ci} className="space-y-3 rounded-lg bg-muted/30 p-3">
-                      <legend className="px-1 text-sm font-medium">Combination {ci + 1}</legend>
-                      <div className="flex items-center gap-2">
-                        <label htmlFor={`combo-${index}-${ci}`} className="text-sm">
-                          Quantity
-                        </label>
-                        <Input
-                          id={`combo-${index}-${ci}`}
-                          type="number"
-                          min={1}
-                          max={500}
-                          className="w-24"
-                          {...register(`lines.${index}.combinations.${ci}.quantity`, {
-                            valueAsNumber: true,
-                          })}
-                          defaultValue={combination.quantity}
-                        />
-                        {line.combinations.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() =>
-                              setValue(
-                                `lines.${index}.combinations`,
-                                line.combinations.filter((_, i) => i !== ci),
-                              )
-                            }
-                          >
-                            Remove combination
-                          </Button>
-                        )}
-                      </div>
-                      {dish.groups.map((group) => (
-                        <div key={group.id} className="space-y-1">
-                          <p className="text-sm font-medium">
-                            {group.name}{' '}
-                            <span className="font-normal text-muted-foreground">
-                              ({groupRule(group.minSelect, group.maxSelect)})
-                            </span>
-                          </p>
-                          <div className="flex flex-wrap gap-x-5 gap-y-2">
-                            {group.options.map((option) => (
-                              <label
-                                key={option.id}
-                                className={`flex items-center gap-2 text-sm ${option.allergyConflicts.length ? 'text-destructive' : ''}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={combination.optionIds.includes(option.id)}
-                                  onChange={(e) =>
-                                    setValue(
-                                      `lines.${index}.combinations.${ci}.optionIds`,
-                                      e.target.checked
-                                        ? [...combination.optionIds, option.id]
-                                        : combination.optionIds.filter((id) => id !== option.id),
-                                      { shouldDirty: true },
-                                    )
-                                  }
-                                />
-                                {option.name} (+{formatCents(option.priceCents)})
-                                {option.allergyConflicts.length ? ' · allergy warning' : ''}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      {!dish.groups.length && (
-                        <p className="text-sm text-muted-foreground">
-                          No option groups; one combination.
-                        </p>
-                      )}
-                    </fieldset>
-                  ))}
-                  {dish.groups.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        setValue(`lines.${index}.combinations`, [
-                          ...line.combinations,
-                          { quantity: 1, optionIds: [] },
-                        ])
-                      }
-                    >
-                      Add combination
-                    </Button>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Combination quantities must sum to {line.quantity}. Identical combinations merge
-                    when saving. Required choices and minimum quantities are enforced when placing.
-                  </p>
-                  <FormError message={previews[index]?.error} />
-                </>
-              ) : (
-                <FormError message="Dish unavailable" />
-              )}
             </article>
           );
         })}
@@ -563,11 +501,14 @@ export function OrderForm({
                     <Button
                       type="button"
                       className="w-full"
-                      variant="outline"
-                      disabled={chosen.has(dish.menuItemId) || isSubmitting}
-                      onClick={() => append(newLine(dish))}
+                      variant={chosen.has(dish.menuItemId) ? 'secondary' : 'outline'}
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        const index = lines.findIndex((l) => l.menuItemId === dish.menuItemId);
+                        openLine(dish, index === -1 ? null : index);
+                      }}
                     >
-                      {chosen.has(dish.menuItemId) ? 'Added to order' : 'Add dish'}
+                      {chosen.has(dish.menuItemId) ? 'In order · Edit' : 'Add dish'}
                     </Button>
                   }
                 />
@@ -577,11 +518,19 @@ export function OrderForm({
         </section>
       ))}
       <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-4 backdrop-blur">
-        <p className="font-medium">
-          Total:{' '}
-          {total === undefined ? 'Complete line quantities to calculate' : formatCents(total)}{' '}
-          <span className="text-xs text-muted-foreground">pre-tax · server verifies prices</span>
-        </p>
+        <div className="space-y-0.5">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {notice ? `${notice}. ` : ''}
+            <a href="#order-lines" className="text-primary underline-offset-4 hover:underline">
+              {fields.length} {fields.length === 1 ? 'line' : 'lines'} in order
+            </a>
+          </p>
+          <p className="font-medium">
+            Total:{' '}
+            {total === undefined ? 'Complete line quantities to calculate' : formatCents(total)}{' '}
+            <span className="text-xs text-muted-foreground">pre-tax · server verifies prices</span>
+          </p>
+        </div>
         <div className="flex gap-2">
           {(!order || order.status === 'DRAFT') && (
             <Button
@@ -610,6 +559,16 @@ export function OrderForm({
           </Button>
         </div>
       </div>
+      {editing && (
+        <LineDialog
+          dish={editing.dish}
+          initial={editing.initial}
+          mode={editing.index === null ? 'add' : 'edit'}
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          onSave={saveLine}
+        />
+      )}
     </form>
   );
 }
