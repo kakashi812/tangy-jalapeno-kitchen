@@ -24,6 +24,7 @@ import {
 } from '@fernleaf/shared';
 import type { z } from 'zod';
 import { ApiException } from '../common/api-exception.js';
+import { isTransactionConflict } from '../common/transaction-conflict.js';
 import { fromDbDate, toDbDate } from '../common/db-dates.js';
 import { Prisma, type Order } from '../generated/prisma/client.js';
 import { MenuService } from '../menu/menu.service.js';
@@ -159,14 +160,14 @@ export class OrdersService {
           timeout: 30_000,
         });
       } catch (error) {
-        if (
-          attempt < 2 &&
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'P2034'
-        )
-          continue;
+        if (isTransactionConflict(error)) {
+          if (attempt < 2) continue;
+          throw new ApiException(
+            HttpStatus.CONFLICT,
+            'CONCURRENT_UPDATE',
+            'Someone else changed this at the same moment. Refresh and try again.',
+          );
+        }
         if (error instanceof OrderRuleError) throw ApiException.validation(error.fieldErrors);
         throw error;
       }

@@ -14,3 +14,4 @@ export * from './csv.js';
 export * from './employees.js';
 export * from './menu.js';
 export * from './orders.js';
+export * from './kitchen.js';

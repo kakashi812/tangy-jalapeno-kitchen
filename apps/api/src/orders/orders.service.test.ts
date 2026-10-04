@@ -393,6 +393,22 @@ describe('order service validation and snapshots', () => {
     fake.$transaction.mockRejectedValueOnce(new Error('database offline'));
     await expect(service.transaction(run)).rejects.toThrow('database offline');
   });
+  it('retries raw-query row-lock serialization errors and bounds retries', async () => {
+    const { service, fake } = setup();
+    const run = vi.fn().mockResolvedValue('ok');
+    const conflict = {
+      code: 'P2010',
+      meta: { driverAdapterError: { cause: { originalCode: '40001' } } },
+    };
+    fake.$transaction.mockRejectedValueOnce(conflict);
+    expect(await service.transaction(run)).toBe('ok');
+    expect(fake.$transaction).toHaveBeenCalledTimes(2);
+    fake.$transaction.mockRejectedValue(conflict);
+    await expect(service.transaction(run)).rejects.toMatchObject({
+      body: { code: 'CONCURRENT_UPDATE' },
+    });
+    expect(fake.$transaction).toHaveBeenCalledTimes(5);
+  });
 });
 
 describe('batched cutoff processing', () => {

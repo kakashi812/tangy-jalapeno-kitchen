@@ -6,6 +6,7 @@ import {
   ListChecks,
   NotebookTabs,
   ClipboardList,
+  CookingPot,
   Tags,
   Settings,
   Users,
@@ -26,6 +27,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/orders', label: 'Orders', icon: ClipboardList, permission: 'orders.read' },
+  { href: '/kitchen', label: 'Kitchen board', icon: CookingPot, permission: 'kitchen.view' },
   { href: '/catalogue', label: 'Catalogue', icon: UtensilsCrossed, permission: 'catalogue.read' },
   { href: '/menu', label: 'Menu', icon: NotebookTabs, permission: 'menu.read' },
   { href: '/companies', label: 'Companies', icon: Building2, permission: 'companies.read' },
