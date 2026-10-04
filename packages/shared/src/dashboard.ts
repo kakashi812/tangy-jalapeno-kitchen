@@ -12,7 +12,11 @@ export function dashboardKind(permissions: readonly Permission[]): DashboardKind
   if (permissions.includes('deliveries.own')) return 'DRIVER';
   return 'GENERAL';
 }
-type Base = { date: string; asOf: string };
+type Base = {
+  date: string;
+  asOf: string;
+  calendar: { workingDay: boolean; nextWorkingDate: string | null };
+};
 export type Dashboard = Base &
   (
     | {

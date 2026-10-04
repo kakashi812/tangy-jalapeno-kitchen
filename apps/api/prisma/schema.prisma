@@ -554,6 +554,15 @@ model Invoice {
   @@map("invoices")
 }
 
+/// Atomic, append-only coverage marker. Never reset reviewer edits or migrate during access.
+model DemoWeek {
+  startDate  DateTime @id @db.Date
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  orderCount Int
+
+  @@map("demo_weeks")
+}
+
 // Fulfilment is separate from the order's commercial status.
 enum DropStatus {
   WAITING

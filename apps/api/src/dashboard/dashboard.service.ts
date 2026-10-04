@@ -4,6 +4,8 @@ import {
   DROP_STATES,
   ORDER_STATUSES,
   kitchenToday,
+  addDays,
+  isKitchenWorkingDay,
   type Dashboard,
   type DropState,
   type KitchenStationSummary,
@@ -14,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { KitchenService } from '../kitchen/kitchen.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { DemoService } from '../demo/demo.service.js';
 @Injectable()
 export class DashboardService {
   constructor(
@@ -21,14 +24,36 @@ export class DashboardService {
     private readonly orders: OrdersService,
     private readonly kitchen: KitchenService,
     private readonly settings: SettingsService,
+    private readonly demo: DemoService,
   ) {}
   async get(user: SessionUser): Promise<Dashboard> {
+    await this.demo.ensureCurrentWeek();
     await this.orders.processDue();
     const now = new Date(),
       date = kitchenToday(now),
       deliveryDate = toDbDate(date),
-      base = { date, asOf: now.toISOString() },
+      base = {
+        date,
+        asOf: now.toISOString(),
+        calendar: { workingDay: true, nextWorkingDate: null as string | null },
+      },
       kind = dashboardKind(user.permissions);
+    const [platform, holidays] = await Promise.all([
+      this.settings.get(),
+      this.settings.listHolidays(),
+    ]);
+    const calendar = { workingDays: platform.kitchenWorkingDays, holidays };
+    base.calendar = {
+      workingDay: isKitchenWorkingDay(date, calendar),
+      nextWorkingDate: null as string | null,
+    };
+    for (let i = 1; i <= 366; i++) {
+      const next = addDays(date, i);
+      if (isKitchenWorkingDay(next, calendar)) {
+        base.calendar.nextWorkingDate = next;
+        break;
+      }
+    }
     if (kind === 'ADMIN') {
       const [groups, unpaid, reviewInvoices] = await Promise.all([
         this.prisma.order.groupBy({
@@ -60,7 +85,7 @@ export class DashboardService {
       };
     }
     if (kind === 'KITCHEN') {
-      const settings = await this.settings.get();
+      const settings = platform;
       const [work, stations, readyOrders] = await Promise.all([
         this.kitchen.stationSummary(date, now, settings.atRiskMinutes),
         this.prisma.kitchenStation.findMany({

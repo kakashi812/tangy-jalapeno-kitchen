@@ -5,6 +5,7 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { OrdersService } from '../orders/orders.service.js';
 import type { KitchenService } from '../kitchen/kitchen.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
+import type { DemoService } from '../demo/demo.service.js';
 function fixture() {
   const db = {
     order: {
@@ -38,7 +39,10 @@ function fixture() {
     ]),
   };
   const orders = { processDue: vi.fn() },
-    settings = { get: vi.fn().mockResolvedValue({ atRiskMinutes: 30 }) },
+    settings = {
+      get: vi.fn().mockResolvedValue({ atRiskMinutes: 30, kitchenWorkingDays: [1, 2, 3, 4, 5] }),
+      listHolidays: vi.fn().mockResolvedValue([]),
+    },
     kitchen = {
       stationSummary: vi.fn().mockResolvedValue([
         { id: 'hot', name: 'Hot', total: 8, started: 2, done: 3, late: 1, atRisk: 2 },
@@ -58,6 +62,7 @@ function fixture() {
     orders as unknown as OrdersService,
     kitchen as unknown as KitchenService,
     settings as unknown as SettingsService,
+    { ensureCurrentWeek: vi.fn() } as unknown as DemoService,
   );
   return { db, orders, kitchen, settings, service };
 }

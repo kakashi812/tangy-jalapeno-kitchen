@@ -52,6 +52,14 @@ async function Summary() {
           Updated {formatKitchenDateTime(new Date(dashboard.asOf))}
         </p>
       </div>
+      {!dashboard.calendar.workingDay && (
+        <p className="rounded-lg border bg-muted/30 p-4 text-sm">
+          The kitchen is closed today. No weekend/holiday deliveries are generated.
+          {dashboard.calendar.nextWorkingDate &&
+            ` Next kitchen working day: ${formatKitchenDate(dashboard.calendar.nextWorkingDate)}.`}{' '}
+          Use the boards to inspect another working date.
+        </p>
+      )}
       {dashboard.kind === 'ADMIN' && (
         <>
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

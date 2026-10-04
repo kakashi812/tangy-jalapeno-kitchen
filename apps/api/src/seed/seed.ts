@@ -11,6 +11,11 @@ import { seedMenuCategories } from './seed-menu-categories.js';
 import { seedCompanies } from './seed-companies.js';
 import { seedEmployees } from './seed-employees.js';
 import { seedPricing } from './seed-pricing.js';
+import { DemoService } from '../demo/demo.service.js';
+import { MenuService } from '../menu/menu.service.js';
+import { PricingService } from '../pricing/pricing.service.js';
+import { SettingsService } from '../settings/settings.service.js';
+import type { PrismaService } from '../prisma/prisma.service.js';
 
 /**
  * Creates or restores the base data. Safe to run any number of times.
@@ -118,9 +123,17 @@ async function main() {
     const companies = await seedCompanies(prisma);
     const employees = await seedEmployees(prisma);
     const categories = await seedMenuCategories(prisma);
+    // Services share the same client; no server, login hook or migration is run by the seed.
+    const client = prisma as PrismaService;
+    const demo = new DemoService(
+      client,
+      new MenuService(client, new PricingService(client)),
+      new SettingsService(client),
+    );
+    const operational = await demo.seedInitial();
 
     console.log(
-      `Seeded ${categories} menu categories, ${companies} companies, ${employees} employees, ${tiers} price tiers, ${menu.dishes} dishes, ${menu.options} options, ${DEFAULT_ROLES.length} roles, ${STAFF.length} staff accounts, settings, reference lists and ${HOLIDAY_SEED.length} kitchen holidays.`,
+      `Seeded ${categories} menu categories, ${companies} companies, ${employees} employees, ${tiers} price tiers, ${menu.dishes} dishes, ${menu.options} options, ${DEFAULT_ROLES.length} roles, ${STAFF.length} staff accounts, settings, reference lists and ${HOLIDAY_SEED.length} kitchen holidays; ${operational.created} new demo orders across historical/current/three upcoming weeks.`,
     );
   } finally {
     await prisma.$disconnect();

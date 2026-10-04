@@ -18,3 +18,4 @@ export * from './kitchen.js';
 export * from './drops.js';
 export * from './billing.js';
 export * from './dashboard.js';
+export * from './demo.js';
