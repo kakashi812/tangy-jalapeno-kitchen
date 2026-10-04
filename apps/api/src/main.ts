@@ -14,4 +14,9 @@ async function bootstrap() {
   configureApp(app);
   await app.listen(env.PORT);
 }
-await bootstrap();
+// Vercel captures the server during import and starts listening after the module loads.
+// A top-level await here would wait for that listening callback and deadlock the loader.
+void bootstrap().catch((error: unknown) => {
+  console.error('Failed to start the API:', error);
+  process.exitCode = 1;
+});
