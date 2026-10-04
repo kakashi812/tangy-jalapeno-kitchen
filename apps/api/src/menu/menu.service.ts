@@ -110,8 +110,12 @@ export class MenuService {
    * allergies and diet (warnings only), plus a secret category if `code` matches one. Orders (M8)
    * validate against this same function, so the preview and what can be ordered never differ.
    */
-  async forEmployee(employeeId: string, code?: string): Promise<EmployeeMenu> {
-    const employee = await this.prisma.employee.findUnique({
+  async forEmployee(
+    employeeId: string,
+    code?: string | string[],
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<EmployeeMenu> {
+    const employee = await client.employee.findUnique({
       where: { id: employeeId },
       include: {
         allergies: { include: { allergen: { select: { id: true, name: true } } } },
@@ -127,8 +131,8 @@ export class MenuService {
     if (!employee) throw ApiException.notFound('Employee');
 
     const [{ context, tiers }, categories] = await Promise.all([
-      this.pricing.loadContext(),
-      this.prisma.menuCategory.findMany({ include: SOURCE_INCLUDE, orderBy: { sortOrder: 'asc' } }),
+      this.pricing.loadContext(client),
+      client.menuCategory.findMany({ include: SOURCE_INCLUDE, orderBy: { sortOrder: 'asc' } }),
     ]);
     const tier =
       tiers.find((t) => t.id === employee.company.priceTierId) ?? tiers.find((t) => t.isDefault);
@@ -140,8 +144,10 @@ export class MenuService {
       );
 
     const unlocked = new Set<string>();
-    const normalised = code?.trim().toUpperCase();
-    if (normalised) unlocked.add(normalised);
+    const codes = (Array.isArray(code) ? code : [code])
+      .filter((c): c is string => Boolean(c?.trim()))
+      .map((c) => c.trim().toUpperCase());
+    for (const c of codes) unlocked.add(c);
 
     const menu = buildMenu(
       categories.map(toSource),
@@ -157,12 +163,12 @@ export class MenuService {
     );
 
     // A code was given: it must open a secret category this employee can see (decision 21).
-    const unlockedCategory = normalised
-      ? (categories.find(
-          (c) => c.isSecret && c.accessCode === normalised && menu.some((m) => m.id === c.id),
-        )?.name ?? null)
-      : null;
-    if (normalised && !unlockedCategory) {
+    const unlockedCategories = categories.filter(
+      (c) =>
+        c.isSecret && c.accessCode && unlocked.has(c.accessCode) && menu.some((m) => m.id === c.id),
+    );
+    const unlockedCategory = unlockedCategories.map((c) => c.name).join(', ') || null;
+    if (codes.some((code) => !unlockedCategories.some((c) => c.accessCode === code))) {
       throw new ApiException(
         HttpStatus.NOT_FOUND,
         ErrorCode.SecretNotFound,

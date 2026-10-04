@@ -33,19 +33,23 @@ model Role {
 /// A staff member who signs in to the panel (admin, kitchen, dispatch, driver…). Not a customer:
 /// company employees are a separate model and never sign in.
 model User {
-  id               String    @id @default(uuid()) @db.Uuid
+  id               String         @id @default(uuid()) @db.Uuid
   /// Always stored lowercase (enforced by a CHECK constraint in the migration).
-  email            String    @unique
+  email            String         @unique
   name             String
   passwordHash     String
-  roleId           String    @db.Uuid
+  roleId           String         @db.Uuid
   /// Restrict: a role in use can't be deleted.
-  role             Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  role             Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
   /// Staff are deactivated, never deleted, because history (who cooked, who delivered) refers to them.
-  isActive         Boolean   @default(true)
+  isActive         Boolean        @default(true)
   defaultDriverFor Company[]
-  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+  orderEvents      OrderEvent[]
+  orderClosures    OrderClosure[]
+  prepStarted      PrepUnit[]     @relation("PrepStartedBy")
+  prepDone         PrepUnit[]     @relation("PrepDoneBy")
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
 
   @@index([roleId])
   @@map("users")
@@ -119,13 +123,15 @@ model DietaryTag {
 }
 
 model KitchenStation {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  dishes    Dish[]
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  id         String      @id @default(uuid()) @db.Uuid
+  name       String      @unique
+  isActive   Boolean     @default(true)
+  sortOrder  Int         @default(0)
+  dishes     Dish[]
+  orderLines OrderLine[]
+  prepUnits  PrepUnit[]
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
 
   @@map("kitchen_stations")
 }
@@ -147,6 +153,7 @@ model PackagingType {
   isActive  Boolean   @default(true)
   sortOrder Int       @default(0)
   companies Company[]
+  orders    Order[]
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -183,6 +190,7 @@ model Dish {
   optionGroups OptionGroup[]
   prices       DishPrice[]
   menuItems    MenuItem[]
+  orderLines   OrderLine[]
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
 
@@ -379,6 +387,7 @@ model Company {
   hiddenCategories           CompanyHiddenCategory[]
   hiddenMenuItems            CompanyHiddenMenuItem[]
   employees                  Employee[]              @relation("CompanyEmployees")
+  orders                     Order[]
   /// The company owner: one of its own employees (composite FK on (ownerId, id) → employees(id, companyId)).
   ownerId                    String?                 @db.Uuid
   owner                      Employee?               @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -412,6 +421,7 @@ model CompanyAddress {
   postcode      String
   deliveryNotes String   @default("")
   isDefault     Boolean  @default(false)
+  orders        Order[]
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([companyId])
@@ -448,6 +458,7 @@ model Employee {
   canChangePackaging    Boolean              @default(false)
   allergies             EmployeeAllergen[]
   dietaryPreferences    EmployeeDietaryTag[]
+  orders                Order[]
   ownerOf               Company[]            @relation("CompanyOwner")
   createdAt             DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
@@ -456,6 +467,149 @@ model Employee {
   @@unique([id, companyId])
   @@index([companyId, name])
   @@map("employees")
+}
+
+// ─── Orders (M8) ────────────────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  DRAFT
+  PLACED
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+  REJECTED
+}
+
+model Order {
+  id                     String         @id @default(uuid()) @db.Uuid
+  sequence               Int            @unique @default(autoincrement())
+  employeeId             String         @db.Uuid
+  employee               Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  employeeName           String
+  companyId              String         @db.Uuid
+  company                Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyName            String
+  deliveryDate           DateTime       @db.Date
+  deliveryTimeMinutes    Int
+  addressId              String         @db.Uuid
+  address                CompanyAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  addressText            String
+  packagingTypeId        String         @db.Uuid
+  packagingType          PackagingType  @relation(fields: [packagingTypeId], references: [id], onDelete: Restrict)
+  packagingName          String
+  notes                  String         @default("")
+  driverInstructions     String         @default("")
+  dispatchLeadMinutes    Int
+  kitchenBufferMinutes   Int
+  plannedKitchenReadyAt  DateTime       @db.Timestamptz(3)
+  plannedDispatchReadyAt DateTime       @db.Timestamptz(3)
+  cutoffAt               DateTime       @db.Timestamptz(3)
+  status                 OrderStatus    @default(DRAFT)
+  totalCents             Int
+  /// Billing relation added in M11. Null means not yet invoiced.
+  invoiceId              String?        @db.Uuid
+  version                Int            @default(0)
+  kitchenStartedAt       DateTime?      @db.Timestamptz(3)
+  kitchenReadyAt         DateTime?      @db.Timestamptz(3)
+  outForDeliveryAt       DateTime?      @db.Timestamptz(3)
+  lines                  OrderLine[]
+  events                 OrderEvent[]
+  createdAt              DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@index([status, cutoffAt])
+  @@index([deliveryDate, deliveryTimeMinutes])
+  @@index([companyId, deliveryDate])
+  @@index([employeeId])
+  @@map("orders")
+}
+
+model OrderLine {
+  id             String             @id @default(uuid()) @db.Uuid
+  orderId        String             @db.Uuid
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Historical menu item, not a FK: menu categories/items can be removed.
+  menuItemId     String             @db.Uuid
+  dishId         String             @db.Uuid
+  dish           Dish               @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  name           String
+  sku            String
+  temperature    Temperature
+  stationId      String?            @db.Uuid
+  station        KitchenStation?    @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  stationName    String?
+  minOrderQty    Int?
+  quantity       Int
+  dishPriceCents Int
+  /// Historical group ids/names/min/max; groups can be replaced in the catalogue.
+  groups         Json
+  totalCents     Int
+  sortOrder      Int
+  combinations   OrderCombination[]
+
+  @@index([orderId, sortOrder])
+  @@index([dishId])
+  @@index([stationId])
+  @@map("order_lines")
+}
+
+model OrderCombination {
+  id             String    @id @default(uuid()) @db.Uuid
+  lineId         String    @db.Uuid
+  line           OrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  quantity       Int
+  /// Saved option ids, names, group ids/names and individual prices.
+  options        Json
+  unitPriceCents Int
+  totalCents     Int
+  sortOrder      Int
+  prepUnit       PrepUnit?
+
+  @@index([lineId, sortOrder])
+  @@map("order_combinations")
+}
+
+/// Created atomically on confirmation; worked by the kitchen in M9.
+model PrepUnit {
+  id            String           @id @default(uuid()) @db.Uuid
+  combinationId String           @unique @db.Uuid
+  combination   OrderCombination @relation(fields: [combinationId], references: [id], onDelete: Cascade)
+  stationId     String?          @db.Uuid
+  station       KitchenStation?  @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  stationName   String?
+  startedAt     DateTime?        @db.Timestamptz(3)
+  doneAt        DateTime?        @db.Timestamptz(3)
+  startedById   String?          @db.Uuid
+  startedBy     User?            @relation("PrepStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  doneById      String?          @db.Uuid
+  doneBy        User?            @relation("PrepDoneBy", fields: [doneById], references: [id], onDelete: Restrict)
+
+  @@index([stationId])
+  @@map("prep_units")
+}
+
+model OrderEvent {
+  sequence    Int      @unique @default(autoincrement())
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String   @db.Uuid
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type        String
+  description String
+  actorId     String?  @db.Uuid
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  at          DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId, at])
+  @@map("order_events")
+}
+
+model OrderClosure {
+  deliveryDate DateTime @id @db.Date
+  closedAt     DateTime @default(now()) @db.Timestamptz(3)
+  actorId      String   @db.Uuid
+  actor        User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@map("order_closures")
 }
 
 model EmployeeAllergen {

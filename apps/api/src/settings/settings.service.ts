@@ -16,6 +16,7 @@ import {
 import { ApiException } from '../common/api-exception.js';
 import { fromDbDate, toDbDate } from '../common/db-dates.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 const SETTINGS_ID = 1;
 
@@ -28,8 +29,8 @@ export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Falls back to the defaults if the settings row hasn't been created yet. */
-  async get(): Promise<Settings> {
-    const row = await this.prisma.platformSettings.findUnique({ where: { id: SETTINGS_ID } });
+  async get(client: Prisma.TransactionClient = this.prisma): Promise<Settings> {
+    const row = await client.platformSettings.findUnique({ where: { id: SETTINGS_ID } });
     if (!row) return DEFAULT_SETTINGS;
     return {
       kitchenWorkingDays: [...row.kitchenWorkingDays].sort((a, b) => a - b),
@@ -61,8 +62,8 @@ export class SettingsService {
 
   // ─── Kitchen holidays ─────────────────────────────────────────────────────────────────────
 
-  async listHolidays(): Promise<KitchenHoliday[]> {
-    const rows = await this.prisma.kitchenHoliday.findMany({ orderBy: { startDate: 'asc' } });
+  async listHolidays(client: Prisma.TransactionClient = this.prisma): Promise<KitchenHoliday[]> {
+    const rows = await client.kitchenHoliday.findMany({ orderBy: { startDate: 'asc' } });
     return rows.map((row) => ({
       id: row.id,
       name: row.name,

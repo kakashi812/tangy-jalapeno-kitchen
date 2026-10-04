@@ -20,6 +20,7 @@ import type { z } from 'zod';
 import type { TierInputSchema } from '@fernleaf/shared';
 import { ApiException } from '../common/api-exception.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 type TierBody = z.output<typeof TierInputSchema>;
 type TierRow = TierRule & { name: string; description: string; isDefault: boolean };
@@ -38,11 +39,13 @@ export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** All tiers plus every typed price. Small (tiers × items), so loaded whole per request. */
-  async loadContext(): Promise<{ context: PricingContext; tiers: TierRow[] }> {
+  async loadContext(
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<{ context: PricingContext; tiers: TierRow[] }> {
     const [tiers, dishPrices, optionPrices] = await Promise.all([
-      this.prisma.priceTier.findMany({ orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] }),
-      this.prisma.dishPrice.findMany(),
-      this.prisma.optionPrice.findMany(),
+      client.priceTier.findMany({ orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] }),
+      client.dishPrice.findMany(),
+      client.optionPrice.findMany(),
     ]);
     const typed = new Map<string, Map<string, number>>();
     for (const row of [

@@ -1,6 +1,7 @@
 # Local working notes (not part of the submission)
 book/
 CLAUDE.md
+/AGENTS.md
 
 # Dependencies
 node_modules/

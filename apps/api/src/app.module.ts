@@ -4,6 +4,7 @@ import { CatalogueModule } from './catalogue/catalogue.module.js';
 import { CompaniesModule } from './companies/companies.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { MenuModule } from './menu/menu.module.js';
+import { OrdersModule } from './orders/orders.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PricingModule } from './pricing/pricing.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -25,6 +26,7 @@ import { StaffModule } from './staff/staff.module.js';
     CompaniesModule,
     EmployeesModule,
     MenuModule,
+    OrdersModule,
   ],
   controllers: [HealthController],
 })
