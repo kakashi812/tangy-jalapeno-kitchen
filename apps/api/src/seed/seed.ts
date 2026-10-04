@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { DEFAULT_SETTINGS } from '@fernleaf/shared';
-import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { createAdapter } from '../prisma/adapter.js';
 import { hashPassword } from '../auth/password.js';
 import { toDbDate } from '../common/db-dates.js';
 import { HOLIDAY_SEED, REFERENCE_SEED } from './reference-data.js';
@@ -43,7 +43,7 @@ async function main() {
   if (existsSync('.env')) process.loadEnvFile('.env');
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is not set');
-  const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString }) });
+  const prisma = new PrismaClient({ adapter: createAdapter(connectionString) });
 
   try {
     const roleIds = new Map<string, string>();

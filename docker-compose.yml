@@ -1,0 +1,24 @@
+# Local PostgreSQL for development only. The apps themselves run with `pnpm dev`;
+# production uses Neon (see README → Deployment).
+#
+#   docker compose up -d      start the database (data survives restarts in the named volume)
+#   docker compose down -v    stop it and delete the data
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: fernleaf
+      POSTGRES_PASSWORD: fernleaf
+      POSTGRES_DB: fernleaf
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fernleaf -d fernleaf']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
