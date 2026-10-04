@@ -99,7 +99,7 @@ export function OrderForm({
   const dishes = context.menu.categories.flatMap((c) => c.dishes);
   const chosen = new Set(lines.map((l) => l.menuItemId));
   const frozenChoices = !admin && context.closed;
-  const deliveryOverride = order?.status === 'CONFIRMED' && admin;
+  const deliveryOverride = admin;
   const previews = lines.map((line, index) => {
     const saved = order?.lines.find((l) => l.id === line.id);
     if (saved && sameLine(line, saved)) return { cents: saved.totalCents, error: '' };

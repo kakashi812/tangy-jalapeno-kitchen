@@ -8,9 +8,17 @@ export type RoleDefinition = {
 };
 
 /**
- * The four roles from the brief (section 3). Each gets only what that job needs; admins can create
- * further roles in the UI.
+ * The four brief roles plus a least-privilege order-taking role. Admins can create further roles
+ * in the UI; authorization checks permissions, never these role names.
  */
+export const ORDER_DESK_ROLE: RoleDefinition = {
+  name: 'Order Desk',
+  description:
+    'Creates orders on behalf of employees; no locked-order overrides or operational administration.',
+  isSystem: false,
+  permissions: ['orders.read', 'orders.readMoney', 'orders.write'],
+};
+
 export const DEFAULT_ROLES: RoleDefinition[] = [
   {
     name: 'Admin',
@@ -42,4 +50,5 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
     isSystem: false,
     permissions: ['deliveries.own'],
   },
+  ORDER_DESK_ROLE,
 ];

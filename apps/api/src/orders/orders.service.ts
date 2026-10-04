@@ -482,7 +482,9 @@ export class OrdersService {
     if (!address) errors.addressId = ['Choose an address belonging to this company'];
     if (!packaging || (!packaging.isActive && existing?.packagingTypeId !== input.packagingTypeId))
       errors.packagingTypeId = ['Choose an active packaging type'];
-    const checkFlags = existing?.status !== 'CONFIRMED';
+    // Staff normally act as the employee; override permission explicitly bypasses their locks.
+    // Company ownership, active packaging and the platform delivery window still apply below.
+    const checkFlags = !has(user, 'orders.override');
     if (
       checkFlags &&
       !ctx.flags.canChooseAddress &&

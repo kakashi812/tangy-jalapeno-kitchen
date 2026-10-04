@@ -222,12 +222,36 @@ async function Summary() {
           </Link>
         </>
       )}
-      {dashboard.kind === 'GENERAL' && (
-        <p className="rounded-lg border p-5 text-sm text-muted-foreground">
-          Your permissions do not include an operational dashboard. Use the available workspaces
-          below.
-        </p>
-      )}
+      {dashboard.kind === 'GENERAL' &&
+        (can(user, 'orders.write') ? (
+          <section className="space-y-4 rounded-lg border bg-card p-5">
+            <h2 className="font-heading text-xl font-bold">Order desk</h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Take orders on behalf of employees using their company menu and prices. Save
+              unfinished orders as drafts, or place them before cut-off. Locked orders need an
+              Admin.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/orders/new"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+              >
+                Create order
+              </Link>
+              <Link
+                href="/orders"
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Browse orders
+              </Link>
+            </div>
+          </section>
+        ) : (
+          <p className="rounded-lg border p-5 text-sm text-muted-foreground">
+            Your permissions do not include an operational dashboard. Use the available workspaces
+            below.
+          </p>
+        ))}
       <section className="space-y-3">
         <h2 className="font-heading text-xl font-bold">Your workspaces</h2>
         <div className="flex flex-wrap gap-3">

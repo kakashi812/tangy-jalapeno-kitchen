@@ -21,6 +21,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { MenuService } from '../menu/menu.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { seedBoardExamples } from '../seed/board-examples.js';
 
 type PlannedOrder = {
   data: Prisma.OrderCreateManyInput;
@@ -49,6 +50,7 @@ export class DemoService {
     let created = 0;
     for (const offset of [-2, -1, 0, 1, 2, 3])
       created += (await this.ensureWeek(addDays(current, offset * 7), now)).created;
+    created += (await seedBoardExamples(this.prisma, this.menus, this.settings, now)).created;
     return { created };
   }
   async ensureWeek(start: string, now = new Date()) {

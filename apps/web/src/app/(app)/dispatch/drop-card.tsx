@@ -3,7 +3,7 @@ import { DROP_LABELS, formatTimeOfDay, type DropSummary } from '@fernleaf/shared
 import { Badge } from '@/components/ui/badge';
 export function DropCard({ drop, children }: { drop: DropSummary; children?: React.ReactNode }) {
   return (
-    <article className="min-w-0 space-y-3 rounded-lg border p-4">
+    <article className="min-w-0 space-y-3 rounded-lg border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <Link href={`/drops/${drop.id}`} className="font-heading text-xl font-bold underline">
           {drop.company.name} · {formatTimeOfDay(drop.deliveryTimeMinutes)}

@@ -33,6 +33,7 @@ const STAFF = [
   { email: 'kitchen@test.com', name: 'Karan Patel', role: 'Kitchen' },
   { email: 'dispatch@test.com', name: 'Divya Rao', role: 'Dispatch' },
   { email: 'driver@test.com', name: 'Dev Singh', role: 'Driver' },
+  { email: 'orders@test.com', name: 'Order Desk', role: 'Order Desk' },
   // Extra drivers so dispatch has a real choice when assigning drops.
   { email: 'ravi.driver@test.com', name: 'Ravi Kumar', role: 'Driver' },
   { email: 'meera.driver@test.com', name: 'Meera Joshi', role: 'Driver' },

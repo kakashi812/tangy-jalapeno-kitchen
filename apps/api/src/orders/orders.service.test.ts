@@ -15,6 +15,7 @@ import type { PrismaService } from '../prisma/prisma.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import type { DropMembershipService } from '../drops/drop-membership.service.js';
+import { ORDER_DESK_ROLE } from '../seed/roles.js';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const admin: SessionUser = {
@@ -23,6 +24,12 @@ const admin: SessionUser = {
   email: 'admin@test.com',
   role: { id: id(91), name: 'Admin' },
   permissions: ALL_PERMISSIONS,
+};
+const orderDesk: SessionUser = {
+  ...admin,
+  email: 'orders@test.com',
+  role: { id: id(92), name: ORDER_DESK_ROLE.name },
+  permissions: ORDER_DESK_ROLE.permissions,
 };
 const dish: MenuDish = {
   menuItemId: id(1),
@@ -210,6 +217,118 @@ function setup(skipDue = true) {
 beforeEach(() => vi.restoreAllMocks());
 
 describe('order service validation and snapshots', () => {
+  it.each(['draft', 'place'] as const)(
+    'allows Admin to bypass employee delivery locks when creating a %s order',
+    async (intent) => {
+      const { service, fake, company } = setup();
+      company.addresses.push({ ...company.addresses[0]!, id: id(22), isDefault: false });
+      fake.packagingType.findUnique.mockResolvedValue({
+        id: id(23),
+        name: 'Eco box',
+        isActive: true,
+      });
+      await service.create(
+        body({ intent, addressId: id(22), deliveryTimeMinutes: 735, packagingTypeId: id(23) }),
+        admin,
+      );
+      expect(fake.order.create.mock.calls[0]![0].data).toMatchObject({
+        addressId: id(22),
+        deliveryTimeMinutes: 735,
+        packagingTypeId: id(23),
+        status: intent === 'draft' ? 'DRAFT' : 'PLACED',
+      });
+    },
+  );
+
+  it.each(['DRAFT', 'PLACED'] as const)(
+    'allows Admin to bypass employee delivery locks when editing a %s order',
+    async (status) => {
+      const { service, fake, company } = setup();
+      company.addresses.push({ ...company.addresses[0]!, id: id(22), isDefault: false });
+      fake.packagingType.findUnique.mockResolvedValue({
+        id: id(23),
+        name: 'Eco box',
+        isActive: true,
+      });
+      fake.order.findUnique.mockResolvedValue({ ...orderRow(), status } as ReturnType<
+        typeof orderRow
+      >);
+      await service.update(
+        id(100),
+        body({ version: 0, addressId: id(22), deliveryTimeMinutes: 735, packagingTypeId: id(23) }),
+        admin,
+      );
+      expect(fake.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            addressId: id(22),
+            deliveryTimeMinutes: 735,
+            packagingTypeId: id(23),
+          }),
+        }),
+      );
+    },
+  );
+
+  it.each(['addressId', 'deliveryTimeMinutes', 'packagingTypeId'] as const)(
+    'keeps the employee %s lock for Order Desk despite valid alternative choices',
+    async (field) => {
+      const { service, fake, company } = setup();
+      company.addresses.push({ ...company.addresses[0]!, id: id(22), isDefault: false });
+      fake.packagingType.findUnique.mockResolvedValue({
+        id: id(23),
+        name: 'Eco box',
+        isActive: true,
+      });
+      const alternatives = { addressId: id(22), deliveryTimeMinutes: 735, packagingTypeId: id(23) };
+      await expect(
+        service.create(body({ [field]: alternatives[field] }), orderDesk),
+      ).rejects.toMatchObject({ body: { fieldErrors: { [field]: expect.any(Array) } } });
+      expect(fake.order.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not allow Admin to select inactive packaging while bypassing employee locks', async () => {
+    const { service, fake } = setup();
+    fake.packagingType.findUnique.mockResolvedValue({
+      id: id(23),
+      name: 'Inactive box',
+      isActive: false,
+    });
+    await expect(service.create(body({ packagingTypeId: id(23) }), admin)).rejects.toMatchObject({
+      body: { fieldErrors: { packagingTypeId: expect.any(Array) } },
+    });
+    expect(fake.order.create).not.toHaveBeenCalled();
+  });
+
+  it('allows Order Desk to save drafts and place valid employee-priced orders before cutoff', async () => {
+    const { service, fake } = setup();
+    await service.create(body({ intent: 'draft', lines: [] }), orderDesk);
+    expect(fake.order.create.mock.calls[0]![0].data).toMatchObject({
+      status: 'DRAFT',
+      totalCents: 0,
+    });
+    await service.create(body(), orderDesk);
+    expect(fake.order.create.mock.calls[1]![0].data).toMatchObject({
+      status: 'PLACED',
+      totalCents: 1700,
+    });
+  });
+
+  it('keeps employee delivery restrictions and locked-order restrictions for Order Desk', async () => {
+    const { service, fake } = setup();
+    await expect(
+      service.create(body({ deliveryTimeMinutes: 735 }), orderDesk),
+    ).rejects.toMatchObject({
+      body: { fieldErrors: { deliveryTimeMinutes: expect.any(Array) } },
+    });
+    fake.orderClosure.findUnique.mockResolvedValue({ actorId: admin.id });
+    await expect(service.create(body(), orderDesk)).rejects.toMatchObject({
+      body: { code: 'CUTOFF_PASSED' },
+    });
+    expect(fake.order.create).not.toHaveBeenCalled();
+  });
+
   it('uses the same transaction for menu/pricing/settings reads and order creation', async () => {
     const { service, fake, menus, settings } = setup();
     await service.create(body(), admin);
@@ -272,7 +391,9 @@ describe('order service validation and snapshots', () => {
   });
   it('server-enforces employee delivery flags and the platform time window', async () => {
     const { service, fake } = setup();
-    await expect(service.create(body({ deliveryTimeMinutes: 735 }), admin)).rejects.toMatchObject({
+    await expect(
+      service.create(body({ deliveryTimeMinutes: 735 }), orderDesk),
+    ).rejects.toMatchObject({
       body: { fieldErrors: { deliveryTimeMinutes: expect.any(Array) } },
     });
     fake.employee.findUnique.mockResolvedValue({

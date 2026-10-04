@@ -31,7 +31,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-col gap-2 border-b bg-sidebar px-4 py-3 md:bg-background">
+        <header className="flex flex-col gap-2 border-b bg-sidebar px-4 py-3 md:bg-card">
           <div className="flex items-center justify-between gap-4">
             <div className="md:hidden">
               <Brand />

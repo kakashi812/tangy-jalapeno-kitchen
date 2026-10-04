@@ -9,6 +9,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OrdersController } from './orders.controller.js';
 import { OrdersService } from './orders.service.js';
+import { ORDER_DESK_ROLE } from '../seed/roles.js';
 
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 process.env.JWT_SECRET = 'orders-test-secret-at-least-32-characters';
@@ -47,6 +48,13 @@ const users = [
     isActive: true,
     role: { id: id(13), name: 'Driver', isSystem: false, permissions: ['deliveries.own'] },
   },
+  {
+    id: id(5),
+    email: 'orders@test.com',
+    name: 'Order Desk',
+    isActive: true,
+    role: { id: id(14), ...ORDER_DESK_ROLE },
+  },
 ];
 describe('order endpoint access and validation', () => {
   let app: INestApplication, base: string, jwt: JwtService;
@@ -54,6 +62,8 @@ describe('order endpoint access and validation', () => {
     list: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
     create: vi.fn().mockResolvedValue({ id: id(100) }),
     get: vi.fn().mockResolvedValue({ id: id(100) }),
+    context: vi.fn().mockResolvedValue({}),
+    employees: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
     processDue: vi.fn().mockResolvedValue({ confirmed: 0, cancelled: 0 }),
   };
   beforeAll(async () => {
@@ -120,6 +130,38 @@ describe('order endpoint access and validation', () => {
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'VALIDATION_FAILED' });
+  });
+  it('allows Order Desk employee selection, menu context and valid draft creation', async () => {
+    expect((await request('/orders/employees', 5)).status).toBe(200);
+    expect(
+      (await request(`/orders/context?employeeId=${id(20)}&deliveryDate=2099-01-07`, 5)).status,
+    ).toBe(200);
+    expect(
+      (
+        await request('/orders', 5, 'POST', {
+          employeeId: id(20),
+          deliveryDate: '2099-01-07',
+          addressId: id(21),
+          packagingTypeId: id(22),
+          deliveryTimeMinutes: 720,
+          intent: 'draft',
+          lines: [],
+        })
+      ).status,
+    ).toBe(201);
+    expect(service.create).toHaveBeenLastCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        permissions: ORDER_DESK_ROLE.permissions,
+      }),
+    );
+  });
+  it('refuses Order Desk overrides, rejection and manual cutoff processing server-side', async () => {
+    expect((await request(`/orders/${id(100)}/override`, 5, 'PUT', {})).status).toBe(403);
+    expect((await request(`/orders/${id(100)}/reject`, 5, 'POST', {})).status).toBe(403);
+    expect((await request('/orders/close', 5, 'POST', { deliveryDate: '2099-01-07' })).status).toBe(
+      403,
+    );
   });
   it('cron fails closed without a secret and validates its bearer credential', async () => {
     const original = process.env.CRON_SECRET;
