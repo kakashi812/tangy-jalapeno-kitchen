@@ -390,6 +390,7 @@ model Company {
   employees                  Employee[]              @relation("CompanyEmployees")
   orders                     Order[]
   drops                      Drop[]
+  invoices                   Invoice[]
   /// The company owner: one of its own employees (composite FK on (ownerId, id) → employees(id, companyId)).
   ownerId                    String?                 @db.Uuid
   owner                      Employee?               @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -509,8 +510,10 @@ model Order {
   cutoffAt               DateTime       @db.Timestamptz(3)
   status                 OrderStatus    @default(DRAFT)
   totalCents             Int
-  /// Billing relation added in M11. Null means not yet invoiced.
   invoiceId              String?        @db.Uuid
+  invoice                Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  billingReviewReason    String         @default("")
+  shortDeliveryNote      String         @default("")
   version                Int            @default(0)
   kitchenStartedAt       DateTime?      @db.Timestamptz(3)
   kitchenReadyAt         DateTime?      @db.Timestamptz(3)
@@ -527,7 +530,28 @@ model Order {
   @@index([companyId, deliveryDate])
   @@index([employeeId])
   @@index([dropId])
+  @@index([invoiceId])
   @@map("orders")
+}
+
+model Invoice {
+  id                 String    @id @default(uuid()) @db.Uuid
+  sequence           Int       @unique @default(autoincrement())
+  companyId          String    @db.Uuid
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyName        String
+  billingContactName String
+  billingEmail       String
+  totalCents         Int
+  orderCount         Int
+  version            Int       @default(0)
+  issuedAt           DateTime  @default(now()) @db.Timestamptz(3)
+  paidAt             DateTime? @db.Timestamptz(3)
+  orders             Order[]
+
+  @@index([companyId, issuedAt])
+  @@index([paidAt])
+  @@map("invoices")
 }
 
 // Fulfilment is separate from the order's commercial status.

@@ -64,6 +64,13 @@ describe('order lifecycle permissions', () => {
       orderPermissions({ ...confirmed, outForDeliveryAt: now }, admin, false, now).override,
     ).toBe(false);
   });
+  it('locks invoiced order lines but retains delivery overrides and cancellation', () => {
+    const invoiced = { ...state, status: 'CONFIRMED' as const, invoiceId: 'invoice' };
+    const permissions = orderPermissions(invoiced, admin, false, now);
+    expect(permissions.edit).toBe(false);
+    expect(permissions.override).toBe(true);
+    expect(permissions.cancel).toBe(true);
+  });
   it('rejects placed/confirmed orders, not drafts or fulfilled orders', () => {
     for (const status of ORDER_STATUSES)
       expect(orderPermissions({ ...state, status }, admin, false, now).reject).toBe(

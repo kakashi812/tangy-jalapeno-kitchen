@@ -17,6 +17,7 @@ import { ApiRequestError } from '@/lib/api/api-error';
 import { apiGet } from '@/lib/api/server';
 import { can, getSessionUser } from '@/lib/session';
 import { OrderActions, OverrideForm } from './order-actions';
+import { ReportShort } from '../../billing/invoice-actions';
 export const metadata: Metadata = { title: 'Order' };
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -99,6 +100,39 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </dl>
       </section>
       <OrderActions key={order.version} order={order} />
+      {order.invoiceId && can(user, 'billing.read') && (
+        <p className="text-sm">
+          <Link className="text-primary hover:underline" href={`/billing/${order.invoiceId}`}>
+            View issued invoice
+          </Link>{' '}
+          · Invoiced lines and amounts are fixed; delivery overrides remain available.
+        </p>
+      )}
+      {order.billingReviewReason && (
+        <p className="rounded-lg border border-amber-300 p-4 text-sm text-amber-800">
+          Staff review: {order.billingReviewReason}. Issued amount unchanged.
+        </p>
+      )}
+      {order.shortDeliveryNote && (
+        <p className="text-sm">Short delivery: {order.shortDeliveryNote}</p>
+      )}
+      {can(user, 'billing.manage') && order.totalCents !== undefined && (
+        <ReportShort
+          key={`short-${order.version}`}
+          order={{
+            id: order.id,
+            number: order.number,
+            employeeName: order.employee.name,
+            companyName: order.company.name,
+            deliveryDate: order.deliveryDate,
+            status: order.status,
+            totalCents: order.totalCents,
+            version: order.version,
+            billingReviewReason: order.billingReviewReason ?? '',
+            shortDeliveryNote: order.shortDeliveryNote ?? '',
+          }}
+        />
+      )}
       <section className="space-y-4">
         <h2 className="font-heading text-xl font-bold">Saved order lines</h2>
         {order.lines.map((line) => (

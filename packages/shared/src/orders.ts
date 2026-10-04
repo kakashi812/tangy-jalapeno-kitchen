@@ -131,6 +131,9 @@ export type OrderSummary = {
   kitchenReadyAt: string | null;
 };
 export type OrderDetail = OrderSummary & {
+  invoiceId?: string | null;
+  billingReviewReason?: string;
+  shortDeliveryNote?: string;
   version: number;
   cutoffAt: string;
   locked: boolean;

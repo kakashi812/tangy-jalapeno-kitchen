@@ -9,6 +9,7 @@ type OrderState = {
   cutoffAt: Date;
   kitchenStartedAt: Date | null;
   outForDeliveryAt: Date | null;
+  invoiceId?: string | null;
 };
 
 export function orderPermissions(order: OrderState, user: SessionUser, closed: boolean, now: Date) {
@@ -19,7 +20,11 @@ export function orderPermissions(order: OrderState, user: SessionUser, closed: b
   return {
     edit:
       (pending && writable && (!locked || admin)) ||
-      (order.status === 'CONFIRMED' && writable && admin && !order.kitchenStartedAt),
+      (order.status === 'CONFIRMED' &&
+        writable &&
+        admin &&
+        !order.kitchenStartedAt &&
+        !order.invoiceId),
     place: order.status === 'DRAFT' && writable && (!locked || admin),
     cancel:
       (pending && writable && (!locked || admin)) ||

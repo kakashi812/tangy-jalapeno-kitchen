@@ -371,6 +371,11 @@ export class OrdersService {
     const money = has(user, 'orders.readMoney');
     return {
       ...summary(row, money),
+      ...(has(user, 'billing.read') && {
+        invoiceId: row.invoiceId,
+        billingReviewReason: row.billingReviewReason,
+        shortDeliveryNote: row.shortDeliveryNote,
+      }),
       version: row.version,
       cutoffAt: row.cutoffAt.toISOString(),
       locked: !!closure || row.cutoffAt <= new Date(),
@@ -692,7 +697,13 @@ export class OrdersService {
               : 'PLACED';
       await tx.order.update({
         where: { id, version: input.version },
-        data: { status, version: { increment: 1 } },
+        data: {
+          status,
+          ...(row.invoiceId && {
+            billingReviewReason: `Order ${action === 'cancel' ? 'cancelled' : 'rejected'} after invoicing${input.reason ? `: ${input.reason}` : ''}`,
+          }),
+          version: { increment: 1 },
+        },
       });
       await this.event(
         tx,
@@ -761,6 +772,9 @@ export class OrdersService {
           deliveryTimeMinutes: input.deliveryTimeMinutes,
           plannedDispatchReadyAt: dispatch,
           plannedKitchenReadyAt: new Date(dispatch.getTime() - row.kitchenBufferMinutes * 60_000),
+          ...(row.invoiceId && {
+            billingReviewReason: `Delivery overridden after invoicing: ${input.reason}`,
+          }),
           version: { increment: 1 },
         },
       });
