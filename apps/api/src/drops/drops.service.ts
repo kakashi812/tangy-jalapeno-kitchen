@@ -261,6 +261,12 @@ export class DropsService {
       const at = new Date();
       let driverName = '';
       if (action === 'depart') {
+        // The driver can only complete today's drops, so leaving on any other date would strand it.
+        if (fromDbDate(row.deliveryDate) !== kitchenToday())
+          throw conflict(
+            'DEPARTURE_NOT_TODAY',
+            'A drop can only go out for delivery on its delivery date (kitchen time)',
+          );
         if (!row.driverId) throw conflict('DRIVER_REQUIRED', 'Assign a driver before departure');
         driverName = (await this.validDriver(tx, row.driverId)).name;
         await tx.order.updateMany({

@@ -121,6 +121,18 @@ describe('drop progression and delivery', () => {
       body: { fieldErrors: { driverId: expect.any(Array) } },
     });
   });
+  it('refuses departure before or after the delivery date', async () => {
+    const f = fixture();
+    f.row.status = 'DISPATCH_READY';
+    for (const date of ['2026-10-06', '2026-10-02']) {
+      f.row.deliveryDate = new Date(date);
+      await expect(f.service.advance('drop', 3, 'depart', admin)).rejects.toMatchObject({
+        body: { code: 'DEPARTURE_NOT_TODAY' },
+      });
+    }
+    expect(f.db.order.updateMany).not.toHaveBeenCalled();
+    expect(f.db.drop.update).not.toHaveBeenCalled();
+  });
   it('departing updates every order and records the assigned driver', async () => {
     const f = fixture();
     f.row.status = 'DISPATCH_READY';

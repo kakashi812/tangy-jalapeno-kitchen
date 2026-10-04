@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DropSummary } from '@fernleaf/shared';
+import { formatKitchenDate, kitchenToday, type DropSummary } from '@fernleaf/shared';
 import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/form/field';
 import { apiSend } from '@/lib/api/client';
@@ -35,6 +35,8 @@ export function DropActions({
   const [pending, transition] = useTransition();
   const [error, setError] = useState('');
   const editable = !['OUT_FOR_DELIVERY', 'DELIVERED'].includes(drop.state);
+  // Mirrors the API rule: a drop leaves only on its delivery date, in kitchen time.
+  const departsToday = drop.deliveryDate === kitchenToday();
   function send(action: 'ready' | 'depart' | 'driver', driverId?: string) {
     setError('');
     transition(async () => {
@@ -95,12 +97,20 @@ export function DropActions({
         </Button>
       )}
       {advance && drop.state === 'DISPATCH_READY' && (
-        <Button disabled={pending || !drop.driver?.isActive} onClick={() => send('depart')}>
+        <Button
+          disabled={pending || !drop.driver?.isActive || !departsToday}
+          onClick={() => send('depart')}
+        >
           Send out for delivery
         </Button>
       )}
       {drop.state === 'DISPATCH_READY' && !drop.driver?.isActive && (
         <p className="text-sm text-amber-700">Assign an active driver before departure.</p>
+      )}
+      {advance && drop.state === 'DISPATCH_READY' && !departsToday && (
+        <p className="text-sm text-amber-700">
+          This drop can go out for delivery on {formatKitchenDate(drop.deliveryDate)} only.
+        </p>
       )}
     </div>
   );
