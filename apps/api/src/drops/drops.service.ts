@@ -3,12 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { del, put } from '@vercel/blob';
 import {
   deliveryOnTime,
+  deliveryWindowRange,
+  driverVisibleRange,
   dropState,
   kitchenDateTimeToUtc,
   kitchenToday,
   orderNumber,
   pageOffset,
   type DeliveryInput,
+  type DeliveryWindow,
   type DropDetail,
   type DropQuery,
   type DropSummary,
@@ -53,6 +56,9 @@ function summary(row: Row, ready: number): DropSummary {
     onTime: row.onTime,
   };
 }
+/** Inclusive DATE range filter for a { from, to } pair of kitchen dates. */
+const dateRange = ({ from, to }: { from: string; to: string }) =>
+  from === to ? toDbDate(from) : { gte: toDbDate(from), lte: toDbDate(to) };
 const conflict = (code: string, message: string) =>
   new ApiException(HttpStatus.CONFLICT, code, message);
 
@@ -63,10 +69,11 @@ export class DropsService {
     private readonly orders: OrdersService,
   ) {}
 
+  /** Drivers may open their own drops across all three tabs; completing one stays today-only. */
   private scope(user: SessionUser): Prisma.DropWhereInput {
     return has(user, 'dispatch.view')
       ? {}
-      : { driverId: user.id, deliveryDate: toDbDate(kitchenToday()) };
+      : { driverId: user.id, deliveryDate: dateRange(driverVisibleRange(kitchenToday())) };
   }
   private async readyCounts(ids: string[]) {
     const rows = await this.prisma.order.groupBy({
@@ -76,7 +83,12 @@ export class DropsService {
     });
     return new Map(rows.map((row) => [row.dropId, row._count._all]));
   }
-  async list(query: DropQuery, user: SessionUser, own = false): Promise<Paginated<DropSummary>> {
+  /** `own` is the driver's tab on their deliveries page; without it this is the dispatch board. */
+  async list(
+    query: DropQuery,
+    user: SessionUser,
+    own?: DeliveryWindow,
+  ): Promise<Paginated<DropSummary>> {
     await this.orders.processDue();
     const state: Prisma.DropWhereInput =
       query.state === 'KITCHEN_READY'
@@ -89,8 +101,12 @@ export class DropsService {
           : query.state
             ? { status: query.state }
             : {};
-    const where: Prisma.DropWhereInput =
-      own || !has(user, 'dispatch.view')
+    const where: Prisma.DropWhereInput = own
+      ? {
+          driverId: user.id,
+          deliveryDate: dateRange(deliveryWindowRange(own, kitchenToday())),
+        }
+      : !has(user, 'dispatch.view')
         ? { driverId: user.id, deliveryDate: toDbDate(kitchenToday()) }
         : {
             deliveryDate: toDbDate(query.deliveryDate ?? kitchenToday()),
@@ -104,7 +120,11 @@ export class DropsService {
         include: INCLUDE,
         skip: pageOffset(query),
         take: query.pageSize,
-        orderBy: [{ deliveryTimeMinutes: 'asc' }, { id: 'asc' }],
+        // Past deliveries read newest first; today and upcoming read in the order they happen.
+        orderBy:
+          own === 'past'
+            ? [{ deliveryDate: 'desc' }, { deliveryTimeMinutes: 'desc' }, { id: 'asc' }]
+            : [{ deliveryDate: 'asc' }, { deliveryTimeMinutes: 'asc' }, { id: 'asc' }],
       }),
       this.prisma.drop.count({ where }),
     ]);

@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { DROP_LABELS, formatTimeOfDay, type DropSummary } from '@fernleaf/shared';
+import {
+  DROP_LABELS,
+  formatKitchenTime,
+  formatTimeOfDay,
+  type DropSummary,
+} from '@fernleaf/shared';
 import { Badge } from '@/components/ui/badge';
 export function DropCard({ drop, children }: { drop: DropSummary; children?: React.ReactNode }) {
   return (
@@ -22,6 +27,13 @@ export function DropCard({ drop, children }: { drop: DropSummary; children?: Rea
       {drop.onTime !== null && (
         <p className={drop.onTime ? 'text-sm text-green-700' : 'text-sm text-red-700'}>
           {drop.onTime ? 'Delivered on time' : 'Delivered late'}
+          {drop.deliveredAt && ` at ${formatKitchenTime(new Date(drop.deliveredAt))}`}
+          {drop.photoUrl && ' · photo attached'}
+        </p>
+      )}
+      {drop.deliveryNote && (
+        <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+          “{drop.deliveryNote}”
         </p>
       )}
       {children}

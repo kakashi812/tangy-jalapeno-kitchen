@@ -15,9 +15,11 @@ import {
   DeliveryInputSchema,
   DropActionSchema,
   DropAssignmentSchema,
+  DeliveryQuerySchema,
   DropQuerySchema,
   PageQuerySchema,
   type DeliveryInput,
+  type DeliveryQuery,
   type DropQuery,
   type SessionUser,
 } from '@fernleaf/shared';
@@ -86,10 +88,10 @@ export class DeliveriesController {
   @Get()
   @RequirePermission('deliveries.own')
   list(
-    @Query(new ZodValidationPipe(DropQuerySchema)) query: DropQuery,
+    @Query(new ZodValidationPipe(DeliveryQuerySchema)) query: DeliveryQuery,
     @CurrentUser() user: SessionUser,
   ) {
-    return this.drops.list(query, user, true);
+    return this.drops.list({ page: query.page, pageSize: query.pageSize }, user, query.window);
   }
   @Post(':id/deliver')
   @RequirePermission('deliveries.own')

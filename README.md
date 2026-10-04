@@ -73,7 +73,7 @@ Open http://localhost:3000 and sign in with any account above. `docker compose d
 pnpm format:check   # Prettier
 pnpm lint           # ESLint (flat config; Next rules apply to apps/web only)
 pnpm typecheck      # tsc in every package
-pnpm test           # Vitest: 131 shared + 188 API tests
+pnpm test           # Vitest: 134 shared + 190 API tests
 pnpm build          # shared → API → web
 ```
 
@@ -231,7 +231,7 @@ A drop is the unit dispatch works with, and the board lets you open each order i
 | Delivered                | this driver's drops delivered today                                                                                                    |
 | On time / late / unknown | delivered drops split by `onTime = true / false / not recorded`. Unknown is shown as its own number, never hidden inside a percentage. |
 
-The list below the figures shows the drops in time order, each with a "mark delivered" form. **Not shown:** other drivers' work, money, or past and future days.
+The dashboard figures cover today only. **My deliveries** has three tabs: **Today** (the default, in time order, with the "mark delivered" form), **Upcoming** (the next 14 days) and **Past** (the last 30 days, newest first, with delivered time, on time or late, note and photo). **Not shown:** other drivers' work or money.
 
 ### Order Desk / general
 
@@ -277,12 +277,13 @@ I built it module by module as vertical slices (API, shared rules and screens to
 | Packaging types                                          | An admin-managed reference list, like allergens and stations, because companies and employees choose from it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | "Can change delivery time"                               | Any quarter hour inside a platform delivery window (a setting, 08:00–20:00 by default). Addresses are chosen from the company's address list, not typed freely.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | "Today" during the two-week review                       | The seed creates orders in every status across past weeks, the current week and the following weeks, including drops for `driver@test.com` on working days. If a reviewer opens the app in a week outside that coverage, a small, idempotent, concurrency-safe top-up adds one more week of valid examples. It never resets reviewer changes, and `DEMO_DATA_ENABLED=false` turns it off. The kitchen stays Monday–Friday, so **a weekend reviewer sees a "kitchen closed" banner** instead of fake weekend deliveries. Early-confirmed examples are labelled in their notes, so future kitchen boards aren't empty. |
+| "A driver sees only their own drops for today"           | Today is the landing view and the only day a drop can be marked delivered. Drivers can also read their own drops for the last 30 and next 14 days, to check past deliveries and plan ahead. The server enforces the range and the ownership, and other drivers' drops stay hidden.                                                                                                                                                                                                                                                                                                                                   |
 
 ---
 
 ## Testing
 
-- **319 Vitest tests:** 131 in `packages/shared` and 188 in `apps/api`.
+- **324 Vitest tests:** 134 in `packages/shared` and 190 in `apps/api`.
 - They focus on the rules the brief calls out as most likely to break:
   - **cut-off calculation**: `calendar.test.ts`, including holidays and weekends; `kitchen-time.test.ts` covers zone conversion independent of the host zone
   - **pricing resolution and rounding**: `pricing.test.ts`, including chains, cycles and the 5-cent edges

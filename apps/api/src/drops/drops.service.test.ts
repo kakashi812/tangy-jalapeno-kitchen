@@ -239,7 +239,7 @@ describe('drop progression and delivery', () => {
         companyId: '00000000-0000-4000-8000-000000000001',
       }),
       driver,
-      true,
+      'today',
     );
     expect(f.db.drop.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -255,7 +255,31 @@ describe('drop progression and delivery', () => {
       }),
     );
   });
-  it('scopes driver detail reads by owner and kitchen date', async () => {
+  it('lists upcoming in delivery order and past newest first, within the driver range', async () => {
+    const f = fixture();
+    const page = { page: 1, pageSize: 20 };
+    await f.service.list(page, driver, 'upcoming');
+    expect(f.db.drop.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          driverId: 'driver',
+          deliveryDate: { gte: new Date('2026-10-06'), lte: new Date('2026-10-19') },
+        },
+        orderBy: [{ deliveryDate: 'asc' }, { deliveryTimeMinutes: 'asc' }, { id: 'asc' }],
+      }),
+    );
+    await f.service.list(page, driver, 'past');
+    expect(f.db.drop.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          driverId: 'driver',
+          deliveryDate: { gte: new Date('2026-09-05'), lte: new Date('2026-10-04') },
+        },
+        orderBy: [{ deliveryDate: 'desc' }, { deliveryTimeMinutes: 'desc' }, { id: 'asc' }],
+      }),
+    );
+  });
+  it('scopes driver detail reads to their own drops in the visible range', async () => {
     const f = fixture();
     f.db.drop.findFirst.mockResolvedValue(null);
     await expect(f.service.get('other', { page: 1, pageSize: 20 }, driver)).rejects.toMatchObject({
@@ -263,8 +287,24 @@ describe('drop progression and delivery', () => {
     });
     expect(f.db.drop.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'other', driverId: 'driver', deliveryDate: new Date('2026-10-05') },
+        where: {
+          id: 'other',
+          driverId: 'driver',
+          deliveryDate: { gte: new Date('2026-09-05'), lte: new Date('2026-10-19') },
+        },
       }),
     );
+  });
+  it('lets a driver open a past drop but never complete it', async () => {
+    const f = fixture();
+    f.db.drop.findFirst.mockResolvedValue({
+      ...(await f.db.drop.findUnique()),
+      driverId: 'driver',
+      deliveryDate: new Date('2026-10-02'),
+      status: 'OUT_FOR_DELIVERY',
+    });
+    f.db.order.findMany.mockResolvedValue([]);
+    const detail = await f.service.get('drop', { page: 1, pageSize: 20 }, driver);
+    expect(detail.canDeliver).toBe(false);
   });
 });

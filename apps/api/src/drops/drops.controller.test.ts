@@ -109,8 +109,15 @@ describe('dispatch and delivery endpoint access', () => {
     expect(service.list).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ id: id(4) }),
-      true,
+      'today',
     );
+    await req('/deliveries?window=past', 4);
+    expect(service.list).toHaveBeenLastCalledWith(
+      { page: 1, pageSize: 20 },
+      expect.objectContaining({ id: id(4) }),
+      'past',
+    );
+    expect((await req('/deliveries?window=everything', 4)).status).toBe(400);
   });
   it('allows dispatch assignment/steps and blocks driver/kitchen mutations', async () => {
     expect(
