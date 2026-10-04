@@ -48,6 +48,7 @@ model User {
   orderClosures    OrderClosure[]
   prepStarted      PrepUnit[]     @relation("PrepStartedBy")
   prepDone         PrepUnit[]     @relation("PrepDoneBy")
+  assignedDrops    Drop[]
   createdAt        DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
 
@@ -388,6 +389,7 @@ model Company {
   hiddenMenuItems            CompanyHiddenMenuItem[]
   employees                  Employee[]              @relation("CompanyEmployees")
   orders                     Order[]
+  drops                      Drop[]
   /// The company owner: one of its own employees (composite FK on (ownerId, id) → employees(id, companyId)).
   ownerId                    String?                 @db.Uuid
   owner                      Employee?               @relation("CompanyOwner", fields: [ownerId, id], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -422,6 +424,7 @@ model CompanyAddress {
   deliveryNotes String   @default("")
   isDefault     Boolean  @default(false)
   orders        Order[]
+  drops         Drop[]
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([companyId])
@@ -512,6 +515,8 @@ model Order {
   kitchenStartedAt       DateTime?      @db.Timestamptz(3)
   kitchenReadyAt         DateTime?      @db.Timestamptz(3)
   outForDeliveryAt       DateTime?      @db.Timestamptz(3)
+  dropId                 String?        @db.Uuid
+  drop                   Drop?          @relation(fields: [dropId], references: [id], onDelete: Restrict)
   lines                  OrderLine[]
   events                 OrderEvent[]
   createdAt              DateTime       @default(now()) @db.Timestamptz(3)
@@ -521,7 +526,44 @@ model Order {
   @@index([deliveryDate, deliveryTimeMinutes])
   @@index([companyId, deliveryDate])
   @@index([employeeId])
+  @@index([dropId])
   @@map("orders")
+}
+
+// Fulfilment is separate from the order's commercial status.
+enum DropStatus {
+  WAITING
+  DISPATCH_READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
+model Drop {
+  id                  String         @id @default(uuid()) @db.Uuid
+  companyId           String         @db.Uuid
+  company             Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  addressId           String         @db.Uuid
+  address             CompanyAddress @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  deliveryDate        DateTime       @db.Date
+  deliveryTimeMinutes Int
+  driverId            String?        @db.Uuid
+  driver              User?          @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  status              DropStatus     @default(WAITING)
+  version             Int            @default(0)
+  dispatchReadyAt     DateTime?      @db.Timestamptz(3)
+  outForDeliveryAt    DateTime?      @db.Timestamptz(3)
+  deliveredAt         DateTime?      @db.Timestamptz(3)
+  deliveryNote        String         @default("")
+  photoUrl            String?
+  onTime              Boolean?
+  orders              Order[]
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(3)
+
+  @@unique([companyId, addressId, deliveryDate, deliveryTimeMinutes])
+  @@index([deliveryDate, deliveryTimeMinutes])
+  @@index([driverId, deliveryDate])
+  @@map("drops")
 }
 
 model OrderLine {

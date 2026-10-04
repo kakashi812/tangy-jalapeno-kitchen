@@ -14,6 +14,7 @@ import type { MenuService } from '../menu/menu.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import type { DropMembershipService } from '../drops/drop-membership.service.js';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const admin: SessionUser = {
@@ -198,6 +199,10 @@ function setup(skipDue = true) {
     fake as unknown as PrismaService,
     menus as unknown as MenuService,
     settings as unknown as SettingsService,
+    {
+      sync: vi.fn().mockResolvedValue(undefined),
+      confirmBatch: vi.fn().mockResolvedValue(undefined),
+    } as unknown as DropMembershipService,
   );
   if (skipDue) vi.spyOn(service, 'processDue').mockResolvedValue({ confirmed: 0, cancelled: 0 });
   return { fake, menus, settings, company, service };

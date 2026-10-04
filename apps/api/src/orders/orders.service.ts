@@ -24,6 +24,7 @@ import {
 } from '@fernleaf/shared';
 import type { z } from 'zod';
 import { ApiException } from '../common/api-exception.js';
+import { DropMembershipService } from '../drops/drop-membership.service.js';
 import { isTransactionConflict } from '../common/transaction-conflict.js';
 import { fromDbDate, toDbDate } from '../common/db-dates.js';
 import { Prisma, type Order } from '../generated/prisma/client.js';
@@ -149,6 +150,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly menu: MenuService,
     private readonly settings: SettingsService,
+    private readonly drops: DropMembershipService,
   ) {}
 
   /** Retry serialization failures only. Every operation is wholly rolled back before a retry. */
@@ -655,6 +657,7 @@ export class OrdersService {
         if (existing.status !== 'CONFIRMED')
           await this.event(tx, id, 'CONFIRMED', 'Order confirmed after closure', user.id);
       }
+      await this.drops.sync(tx, id);
     });
     return { id };
   }
@@ -702,6 +705,7 @@ export class OrdersService {
         await this.createPrep(tx, id);
         await this.event(tx, id, 'CONFIRMED', 'Order confirmed after closure', user.id);
       }
+      await this.drops.sync(tx, id);
     });
     return { id };
   }
@@ -767,6 +771,7 @@ export class OrdersService {
         `Delivery ${formatKitchenTime(kitchenDateTimeToUtc(fromDbDate(row.deliveryDate), row.deliveryTimeMinutes))} → ${formatKitchenTime(kitchenDateTimeToUtc(fromDbDate(row.deliveryDate), input.deliveryTimeMinutes))}; address ${row.addressText} → ${addressText}; packaging ${row.packagingName} → ${packagingName}. Reason: ${input.reason}`,
         user.id,
       );
+      await this.drops.sync(tx, id);
     });
     return { id };
   }
@@ -803,6 +808,7 @@ export class OrdersService {
       ),
       skipDuplicates: true,
     });
+    await this.drops.sync(tx, orderId);
   }
 
   async event(
@@ -870,6 +876,10 @@ export class OrdersService {
           ),
         );
         if (units.length) await tx.prepUnit.createMany({ data: units, skipDuplicates: true });
+        await this.drops.confirmBatch(
+          tx,
+          placed.map((order) => order.id),
+        );
         if (pending.length)
           await tx.orderEvent.createMany({
             data: pending.map((o) => {

@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { isTransactionConflict } from './transaction-conflict.js';
 describe('transaction conflict classification', () => {
+  it('recognises direct adapter commit-time serialization conflicts without a Prisma wrapper', () => {
+    expect(
+      isTransactionConflict({
+        name: 'DriverAdapterError',
+        cause: { originalCode: '40001', kind: 'TransactionWriteConflict' },
+      }),
+    ).toBe(true);
+    expect(
+      isTransactionConflict({
+        name: 'DriverAdapterError',
+        cause: { originalCode: '40P01', kind: 'TransactionWriteConflict' },
+      }),
+    ).toBe(true);
+    expect(
+      isTransactionConflict({ name: 'DriverAdapterError', cause: { originalCode: '23505' } }),
+    ).toBe(false);
+  });
   it('recognises ORM conflicts and raw-query serialization/deadlock conflicts', () => {
     expect(isTransactionConflict({ code: 'P2034' })).toBe(true);
     expect(isTransactionConflict({ code: 'P2010', meta: { code: '40001' } })).toBe(true);

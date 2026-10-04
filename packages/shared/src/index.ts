@@ -15,3 +15,4 @@ export * from './employees.js';
 export * from './menu.js';
 export * from './orders.js';
 export * from './kitchen.js';
+export * from './drops.js';
