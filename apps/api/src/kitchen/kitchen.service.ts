@@ -138,34 +138,13 @@ export class KitchenService {
         ],
       }),
       this.prisma.prepUnit.count({ where }),
-      this.prisma.$queryRaw<StationStats[]>`
-        SELECT p."stationId" AS id, COALESCE(MAX(p."stationName"), 'Unassigned') AS name,
-          COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE p."startedAt" IS NOT NULL AND p."doneAt" IS NULL) AS started,
-          COUNT(*) FILTER (WHERE p."doneAt" IS NOT NULL) AS done,
-          COUNT(*) FILTER (WHERE p."doneAt" IS NULL AND o."plannedKitchenReadyAt" < ${now}) AS late,
-          COUNT(*) FILTER (WHERE p."doneAt" IS NULL AND p."startedAt" IS NULL
-            AND o."plannedKitchenReadyAt" >= ${now}
-            AND o."plannedKitchenReadyAt" <= ${new Date(now.getTime() + settings.atRiskMinutes * 60_000)}) AS "atRisk"
-        FROM prep_units p JOIN order_combinations c ON c.id=p."combinationId"
-        JOIN order_lines l ON l.id=c."lineId" JOIN orders o ON o.id=l."orderId"
-        WHERE o.status='CONFIRMED' AND o."deliveryDate"=${toDbDate(date)}
-        GROUP BY p."stationId" ORDER BY name ASC
-      `,
+      this.stationSummary(date, now, settings.atRiskMinutes),
     ]);
     return {
       deliveryDate: date,
       asOf: now.toISOString(),
       atRiskMinutes: settings.atRiskMinutes,
-      stations: stats.map((s) => ({
-        id: s.id,
-        name: s.name,
-        total: Number(s.total),
-        started: Number(s.started),
-        done: Number(s.done),
-        late: Number(s.late),
-        atRisk: Number(s.atRisk),
-      })),
+      stations: stats,
       units: {
         items: rows.map((r) => kitchenUnit(r, now, settings.atRiskMinutes)),
         total,
@@ -173,6 +152,33 @@ export class KitchenService {
         pageSize: query.pageSize,
       },
     };
+  }
+
+  /** Shared full-date aggregation; dashboards do not fetch prep cards just to count work. */
+  async stationSummary(date: string, now: Date, atRiskMinutes: number) {
+    const stats = await this.prisma.$queryRaw<StationStats[]>`
+        SELECT p."stationId" AS id, COALESCE(MAX(p."stationName"), 'Unassigned') AS name,
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE p."startedAt" IS NOT NULL AND p."doneAt" IS NULL) AS started,
+          COUNT(*) FILTER (WHERE p."doneAt" IS NOT NULL) AS done,
+          COUNT(*) FILTER (WHERE p."doneAt" IS NULL AND o."plannedKitchenReadyAt" < ${now}) AS late,
+          COUNT(*) FILTER (WHERE p."doneAt" IS NULL AND p."startedAt" IS NULL
+            AND o."plannedKitchenReadyAt" >= ${now}
+            AND o."plannedKitchenReadyAt" <= ${new Date(now.getTime() + atRiskMinutes * 60_000)}) AS "atRisk"
+        FROM prep_units p JOIN order_combinations c ON c.id=p."combinationId"
+        JOIN order_lines l ON l.id=c."lineId" JOIN orders o ON o.id=l."orderId"
+        WHERE o.status='CONFIRMED' AND o."deliveryDate"=${toDbDate(date)}
+        GROUP BY p."stationId" ORDER BY name ASC
+      `;
+    return stats.map((s) => ({
+      id: s.id,
+      name: s.name,
+      total: Number(s.total),
+      started: Number(s.started),
+      done: Number(s.done),
+      late: Number(s.late),
+      atRisk: Number(s.atRisk),
+    }));
   }
 
   private async lockOrder(tx: Prisma.TransactionClient, id: string): Promise<Order> {
